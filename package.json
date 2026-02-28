@@ -11,10 +11,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/adk": "^0.4.0",
     "@google/genai": "^1.0.0",
     "@huggingface/transformers": "^3.8.1"
   },
   "devDependencies": {
+    "@google/adk-devtools": "^0.4.0",
     "@types/chrome": "^0.0.260",
     "esbuild": "^0.27.3",
     "ruvector": "^0.2.2",
