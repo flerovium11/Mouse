@@ -1,21 +1,33 @@
 {
   "manifest_version": 3,
   "name": "Mouse",
-  "version": "1.0",
+  "version": "0.1.0",
+  "description": "AI-powered smart autocomplete for any browser text field",
 
-  "description": "Cursor for browser",
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Mouse"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "permissions": ["storage", "tabs", "activeTab"],
 
   "web_accessible_resources": [
     {
       "resources": ["*.mjs", "*.wasm"],
       "matches": ["<all_urls>"]
-    }
-  ],
-
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["mouse.js"]
     }
   ]
 }

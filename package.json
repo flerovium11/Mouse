@@ -1,20 +1,23 @@
 {
   "name": "mouse",
-  "version": "1.0.0",
-  "description": "",
-  "main": "mouse.js",
+  "version": "0.1.0",
+  "description": "AI-powered smart autocomplete for any browser text field",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npx esbuild mouse.ts --bundle --outfile=mouse.js --format=iife --platform=browser",
-    "dev": "npx esbuild mouse.ts --bundle --outfile=mouse.js --format=iife --platform=browser --watch"
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@huggingface/transformers": "^3.8.1",
-    "esbuild": "^0.27.3",
-    "typescript": "^5.9.3"
+    "@google/genai": "^1.0.0",
+    "@huggingface/transformers": "^3.8.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0"
+  }
 }
