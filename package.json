@@ -13,7 +13,7 @@
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
     "esbuild": "^0.27.3",
+    "ruvector": "^0.2.2",
     "typescript": "^5.9.3"
-  },
-  "devDependencies": {}
+  }
 }
