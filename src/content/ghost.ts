@@ -1,5 +1,12 @@
+// Ghost text overlay: positions a transparent div over the active input,
+// with invisible typed text followed by gray suggestion text — so the gray
+// text appears exactly at the cursor position.
+
+export type TextInput = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
+
 const GHOST_COLOR = "rgba(0,0,0,0.38)";
-const COPIED_STYLES = [
+
+const COPIED_STYLES: (keyof CSSStyleDeclaration)[] = [
   "fontFamily",
   "fontSize",
   "fontWeight",
@@ -22,17 +29,21 @@ const COPIED_STYLES = [
   "textTransform",
   "whiteSpace",
   "wordBreak",
-  "overflowWrap"
+  "overflowWrap",
 ];
-function isNativeInput(el) {
+
+function isNativeInput(el: HTMLElement): el is HTMLInputElement | HTMLTextAreaElement {
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
 }
-function getValue(el) {
+
+function getValue(el: HTMLElement): string {
   if (isNativeInput(el)) return el.value ?? "";
   return el.textContent ?? "";
 }
-function getCursorPos(el) {
+
+function getCursorPos(el: HTMLElement): number {
   if (isNativeInput(el)) return el.selectionStart ?? el.value.length;
+  // contenteditable: measure characters before the cursor via Selection API
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return getValue(el).length;
   const range = sel.getRangeAt(0);
@@ -41,47 +52,52 @@ function getCursorPos(el) {
   pre.setEnd(range.startContainer, range.startOffset);
   return pre.toString().length;
 }
-class GhostText {
-  constructor() {
-    this.overlay = null;
-    this.activeInput = null;
-    this.suggestion = "";
-  }
-  attach(input) {
+
+export class GhostText {
+  private overlay: HTMLDivElement | null = null;
+  private activeInput: HTMLElement | null = null;
+  private suggestion = "";
+
+  attach(input: TextInput) {
     this.detach();
     this.activeInput = input;
     this.overlay = this.buildOverlay(input);
     document.body.appendChild(this.overlay);
     this.syncPosition();
   }
+
   detach() {
-    var _a;
-    (_a = this.overlay) == null ? void 0 : _a.remove();
+    this.overlay?.remove();
     this.overlay = null;
     this.activeInput = null;
     this.suggestion = "";
   }
-  show(suggestion) {
+
+  show(suggestion: string) {
     if (!this.activeInput || !this.overlay) return;
     if (!getValue(this.activeInput).trim()) return;
     this.suggestion = suggestion;
     this.render();
   }
+
   clear() {
     this.suggestion = "";
     if (this.overlay) this.overlay.replaceChildren();
   }
+
   /** Inserts the suggestion at the cursor. Returns the accepted text, or null if nothing to accept. */
-  accept() {
+  accept(): string | null {
     if (!this.activeInput || !this.suggestion) return null;
     const input = this.activeInput;
     const accepted = this.suggestion;
+
     if (isNativeInput(input)) {
       const cursor = input.selectionStart ?? input.value.length;
       input.value = input.value.slice(0, cursor) + accepted + input.value.slice(cursor);
       const newCursor = cursor + accepted.length;
       input.setSelectionRange(newCursor, newCursor);
     } else {
+      // contenteditable: insert at current selection
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
@@ -92,10 +108,12 @@ class GhostText {
         sel.addRange(range);
       }
     }
+
     input.dispatchEvent(new Event("input", { bubbles: true }));
     this.clear();
     return accepted;
   }
+
   syncPosition() {
     if (!this.activeInput || !this.overlay) return;
     const rect = this.activeInput.getBoundingClientRect();
@@ -104,113 +122,54 @@ class GhostText {
     this.overlay.style.width = `${rect.width}px`;
     this.overlay.style.height = `${rect.height}px`;
   }
-  render() {
+
+  private render() {
     if (!this.activeInput || !this.overlay || !this.suggestion) return;
     const input = this.activeInput;
     const cursor = getCursorPos(input);
     const before = getValue(input).slice(0, cursor);
+
     if (isNativeInput(input)) {
       this.overlay.scrollTop = input.scrollTop;
       this.overlay.scrollLeft = input.scrollLeft;
     }
+
     const invisible = document.createElement("span");
     invisible.style.color = "transparent";
-    invisible.textContent = before.endsWith("\n") ? before + "​" : before;
-    const ghost2 = document.createElement("span");
-    ghost2.style.color = GHOST_COLOR;
-    ghost2.textContent = this.suggestion;
-    this.overlay.replaceChildren(invisible, ghost2);
+    // A trailing \n in pre-wrap doesn't advance the line visually without something after it
+    invisible.textContent = before.endsWith("\n") ? before + "\u200B" : before;
+
+    const ghost = document.createElement("span");
+    ghost.style.color = GHOST_COLOR;
+    ghost.textContent = this.suggestion;
+
+    this.overlay.replaceChildren(invisible, ghost);
   }
-  buildOverlay(input) {
+
+  private buildOverlay(input: TextInput): HTMLDivElement {
     const div = document.createElement("div");
     const cs = window.getComputedStyle(input);
+
     div.style.position = "absolute";
     div.style.pointerEvents = "none";
     div.style.zIndex = "2147483647";
     div.style.overflow = "hidden";
     div.style.userSelect = "none";
     div.style.background = "transparent";
+
     for (const prop of COPIED_STYLES) {
-      div.style[prop] = cs[prop];
+      (div.style as any)[prop] = cs[prop];
     }
+
+    // Override after copying so these aren't clobbered by the loop above
     if (input instanceof HTMLInputElement) {
       div.style.whiteSpace = "nowrap";
     } else {
+      // textarea and contenteditable must render newlines
       div.style.whiteSpace = "pre-wrap";
       div.style.wordBreak = "break-word";
     }
+
     return div;
   }
 }
-const ghost = new GhostText();
-const DEBOUNCE_MS = 500;
-let debounceTimer = null;
-function isTextInput(el) {
-  if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !(el instanceof HTMLElement && el.isContentEditable)) return false;
-  if (el instanceof HTMLInputElement) {
-    const allowed = ["text", "search", "email", "url", "password", ""];
-    return allowed.includes(el.type);
-  }
-  return true;
-}
-function onFocusIn(e) {
-  if (isTextInput(e.target)) {
-    ghost.attach(e.target);
-  }
-}
-function onFocusOut(e) {
-  if (isTextInput(e.target)) {
-    ghost.detach();
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-    }
-  }
-}
-function onInput(e) {
-  if (!isTextInput(e.target)) return;
-  const input = e.target;
-  ghost.clear();
-  ghost.syncPosition();
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    var _a;
-    const value = "value" in input ? input.value : input.textContent ?? "";
-    if (!value.trim()) return;
-    ghost.show("lorem ipsum dolor sit amet");
-    chrome.runtime.sendMessage({
-      type: "REQUEST_COMPLETION",
-      value: "value" in input ? input.value : input.textContent ?? "",
-      cursorPos: input.selectionStart ?? ((_a = input.value) == null ? void 0 : _a.length) ?? 0
-    });
-  }, DEBOUNCE_MS);
-}
-function onKeyDown(e) {
-  if (e.key === "Tab") {
-    const accepted = ghost.accept();
-    if (accepted !== null) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  } else if (e.key === "Escape") {
-    ghost.clear();
-  }
-}
-function onScroll() {
-  ghost.syncPosition();
-}
-function initCapture() {
-  document.addEventListener("focusin", onFocusIn);
-  document.addEventListener("focusout", onFocusOut);
-  document.addEventListener("input", onInput);
-  document.addEventListener("keydown", onKeyDown, true);
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", () => ghost.syncPosition());
-}
-initCapture();
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "COMPLETION_RESULT") {
-    console.log("Received suggestions:", msg.suggestions);
-  }
-});
-//# sourceMappingURL=content.js.map
