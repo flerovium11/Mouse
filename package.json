@@ -1,0 +1,18 @@
+{
+  "name": "mouse",
+  "version": "1.0.0",
+  "description": "",
+  "main": "mouse.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {}
+}
