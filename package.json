@@ -5,7 +5,8 @@
   "main": "mouse.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npx esbuild mouse.ts --bundle --outfile=mouse.js --format=iife --platform=browser"
+    "build": "npx esbuild mouse.ts --bundle --outfile=mouse.js --format=iife --platform=browser",
+    "dev": "npx esbuild mouse.ts --bundle --outfile=mouse.js --format=iife --platform=browser --watch"
   },
   "keywords": [],
   "author": "",

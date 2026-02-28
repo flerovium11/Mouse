@@ -1,5 +1,5 @@
 import { pipeline, env } from '@huggingface/transformers';
-env.backends.onnx.wasm.proxy = false;
+//env.backends.onnx.wasm.proxy = false;
 env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('/');
 
 const data = [
@@ -126,15 +126,22 @@ const data = [
   "The package sidebar shows `npm i ruvector` for installation, links to its GitHub and homepage, reports 15,276 weekly downloads, version 0.2.2, MIT license, 8.72 MB unpacked size, 123 total files, and was last published 5 hours ago."
 ];
 
-const target = 'javascript is an amazing language';
+const target = 'javascript is an amazing languages';
 
 (async () => {
   console.log("Mouse extension loaded");
 
-  const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { device: 'wasm' });
+  const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { 
+    device: 'auto',
+  dtype:'fp32' });
+
+  console.log('Settings:', env.backends.onnx.wasm);
 
   console.log(`Extracting ${data.length} vectors...`);
+  console.time('Extraction time');
   const out = await extractor(data, { pooling: 'mean', normalize: true });
+  console.timeEnd('Extraction time');
+  console.log('Extraction complete. Output shape:', out.dims);
   const targetVec = await extractor(target, { pooling: 'mean', normalize: true });
 
   const targetNorm = Math.sqrt(targetVec.data.reduce((sum: number, val: number) => sum + val * val, 0));
