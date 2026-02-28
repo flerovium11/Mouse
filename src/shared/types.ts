@@ -18,7 +18,6 @@ type PageElement = {
 type PageContext = {
   timestamp: number;
   tabId: number;
-  sessionId: string;
 
   page: Page;
   element: PageElement;
@@ -33,7 +32,6 @@ type DOMAction = {
   id: string;
   timestamp: number;
   tabId: number;
-  sessionId: string;
 
   page: Page;
 

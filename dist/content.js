@@ -142,6 +142,9 @@ class GhostText {
     return div;
   }
 }
+async function getSuggestions(ctx) {
+  return ["test hello"];
+}
 const ghost = new GhostText();
 const DEBOUNCE_MS = 500;
 let debounceTimer = null;
@@ -174,14 +177,21 @@ function onInput(e) {
   ghost.syncPosition();
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    var _a;
+    var _a, _b;
     const value = "value" in input ? input.value : input.textContent ?? "";
     if (!value.trim()) return;
-    ghost.show("lorem ipsum dolor sit amet");
-    chrome.runtime.sendMessage({
-      type: "REQUEST_COMPLETION",
-      value: "value" in input ? input.value : input.textContent ?? "",
-      cursorPos: input.selectionStart ?? ((_a = input.value) == null ? void 0 : _a.length) ?? 0
+    ({
+      element: {
+        tag: input.tagName.toLowerCase(),
+        type: input instanceof HTMLInputElement ? input.type : void 0,
+        label: (input.id ? (_b = (_a = document.querySelector(`label[for="${input.id}"]`)) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim() : void 0) ?? void 0,
+        placeholder: "placeholder" in input ? input.placeholder || void 0 : void 0,
+        nameAttr: "name" in input ? input.name || void 0 : void 0,
+        ariaLabel: input.getAttribute("aria-label") ?? void 0
+      }
+    });
+    getSuggestions().then((suggestions) => {
+      if (suggestions.length > 0) ghost.show(suggestions[0]);
     });
   }, DEBOUNCE_MS);
 }

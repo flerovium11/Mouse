@@ -1,4 +1,5 @@
 import { GhostText } from "./ghost";
+import { getSuggestions } from "../background/agent";
 
 export const ghost = new GhostText();
 
@@ -40,11 +41,27 @@ function onInput(e: Event) {
   debounceTimer = setTimeout(() => {
     const value = "value" in input ? (input as HTMLInputElement).value : (input as HTMLElement).textContent ?? "";
     if (!value.trim()) return;
-    ghost.show("lorem ipsum dolor sit amet"); //TODO: Implement suggestion logic
-    chrome.runtime.sendMessage({
-      type: "REQUEST_COMPLETION",
-      value: "value" in input ? (input as HTMLInputElement).value : (input as HTMLElement).textContent ?? "",
-      cursorPos: (input as HTMLInputElement).selectionStart ?? (input as HTMLInputElement).value?.length ?? 0,
+    const context: PageContext = {
+      timestamp: Date.now(),
+      tabId: 0,
+      page: {
+        url: window.location.href,
+        title: document.title,
+        domain: window.location.hostname,
+      },
+      element: {
+        tag: input.tagName.toLowerCase(),
+        type: input instanceof HTMLInputElement ? input.type : undefined,
+        label: (input.id ? document.querySelector(`label[for="${input.id}"]`)?.textContent?.trim() : undefined) ?? undefined,
+        placeholder: "placeholder" in input ? (input as HTMLInputElement).placeholder || undefined : undefined,
+        nameAttr: "name" in input ? (input as HTMLInputElement).name || undefined : undefined,
+        ariaLabel: input.getAttribute("aria-label") ?? undefined,
+      },
+      latestDomActions: [],
+      generatedDescription: "",
+    };
+    getSuggestions(context).then(suggestions => {
+      if (suggestions.length > 0) ghost.show(suggestions[0]);
     });
   }, DEBOUNCE_MS);
 }
