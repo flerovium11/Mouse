@@ -1,0 +1,9 @@
+You are a smart summarizer. Take the following website text and extract only the **meaningful content** that a user would want to remember or act on. Ignore website structure, navigation menus, footers, or system messages. Focus only on **tasks, deadlines, instructions, or factual content** that can be useful later.  
+
+Output a JSON array of strings. Each string should be **1–3 sentences**, representing a single idea or piece of actionable information.  
+Do not include any IDs, tags, or structural info. Output **JSON only**, no extra commentary.
+
+Website text:
+"""
+{}
+"""
