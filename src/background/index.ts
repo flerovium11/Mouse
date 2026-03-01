@@ -11,6 +11,9 @@ import {
 import { register, dump, gen } from "@shared/mock-api";
 
 console.info("Background service worker started");
+chrome.storage.session.setAccessLevel({
+  accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS",
+});
 
 const pageContexts = new Map<number, PageContext>();
 const domActions: DOMAction[] = [];
@@ -41,6 +44,7 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
       break;
     case MessageType.PAGE_CONTEXT:
       pageContexts.set(tabId, { ...msg.pageContext, tabId, frameId });
+      console.log("Received page context for tab", tabId, "frame", frameId);
       console.log(msg.pageContext.content);
       getUuid()
         .then((id) => dump(id, msg.pageContext))

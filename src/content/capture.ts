@@ -32,11 +32,30 @@ function onFocusOut(e: FocusEvent) {
   }
 }
 
+function isPageBodyScrollable(): boolean {
+  return document.body.scrollHeight > window.innerHeight * 1.5;
+}
+
 function sendPageContext() {
+  const pageScrollable = isPageBodyScrollable();
+  const minY = Math.max(window.scrollY - window.innerHeight * 0.5, 0);
+  const maxY = Math.min(
+    window.scrollY + window.innerHeight * 1.5,
+    document.body.scrollHeight,
+  );
+
   const pageContext: PageContext = {
     timestamp: Date.now(),
     pageMetadata: currentPageMetadata(),
-    content: extractContent(),
+    content: pageScrollable
+      ? extractContent(minY, maxY)
+      : extractContent(0, Infinity),
+    contentBounds: pageScrollable
+      ? {
+          start: minY / document.body.scrollHeight,
+          end: maxY / document.body.scrollHeight,
+        }
+      : { start: 0, end: 1 },
   };
 
   chrome.runtime.sendMessage({
@@ -123,8 +142,55 @@ function onKeyDown(e: KeyboardEvent) {
 
 function onScroll() {
   ghost.syncPosition();
+  discoverNewScrollBounds();
+}
 
-  const storageKey = `scroll_${location.href}`;
+function onNewUrlIdle() {
+  sendPageContext();
+}
+
+let currentMinY = window.scrollY;
+let currentMaxY = window.scrollY + window.innerHeight;
+let pageScrollLoaded = false;
+
+let saveNewScrollBoundsTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function discoverNewScrollBounds() {
+  if (!pageScrollLoaded) return;
+  const minY = window.scrollY;
+  const maxY = minY + window.innerHeight;
+  const newDiscoveryThreshold = window.innerHeight * 0.7;
+  if (
+    minY < currentMinY - newDiscoveryThreshold ||
+    maxY > currentMaxY + newDiscoveryThreshold
+  ) {
+    currentMinY = Math.min(currentMinY, minY);
+    currentMaxY = Math.max(currentMaxY, maxY);
+
+    if (saveNewScrollBoundsTimer) clearTimeout(saveNewScrollBoundsTimer);
+    saveNewScrollBoundsTimer = setTimeout(() => {
+      sendPageContext();
+      chrome.storage.session.set({
+        [location.href + "_scroll"]: { minY: currentMinY, maxY: currentMaxY },
+      });
+    }, 3000);
+  }
+}
+
+async function loadPageScrollFromSessionStorage() {
+  const stored = await chrome.storage.session.get(location.href + "_scroll");
+  const storedValue = stored[location.href + "_scroll"];
+
+  if (storedValue) {
+    currentMinY =
+      storedValue.minY === undefined ? window.scrollY : storedValue.minY;
+    currentMaxY =
+      storedValue.maxY === undefined
+        ? window.scrollY + window.innerHeight
+        : storedValue.maxY;
+  }
+
+  pageScrollLoaded = true;
 }
 
 function onUrlChange(lastUrl: string) {
@@ -133,6 +199,8 @@ function onUrlChange(lastUrl: string) {
     lastUrl,
   });
   ghost.clear();
+  pageScrollLoaded = false;
+  loadPageScrollFromSessionStorage();
 }
 
 export function initCapture(): void {
@@ -150,12 +218,12 @@ export function initCapture(): void {
   let lastUrl = location.href;
   // let dwellTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function scheduleSend() {
+  function scheduleNewUrlIdle() {
     // if (dwellTimer) clearTimeout(dwellTimer);
     // dwellTimer = setTimeout(() => {
     //   sendPageContext();
     // }, 3000);
-    waitForIdle(sendPageContext);
+    waitForIdle(onNewUrlIdle);
   }
 
   // document.addEventListener("visibilitychange", () => {
@@ -169,16 +237,17 @@ export function initCapture(): void {
     if (location.href !== lastUrl) {
       onUrlChange(lastUrl);
       lastUrl = location.href;
-      scheduleSend();
+      scheduleNewUrlIdle();
     }
   });
 
   observer.observe(document.body, { subtree: true, childList: true });
 
-  scheduleSend();
+  loadPageScrollFromSessionStorage();
+  scheduleNewUrlIdle();
 }
 
-function waitForIdle(callback: () => void, quietMs = 1000, timeout = 8000) {
+function waitForIdle(callback: () => void, quietMs = 1000, timeout = 10_000) {
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   const start = Date.now();
 

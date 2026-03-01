@@ -24,15 +24,8 @@ const excludeSelectors = [
   "[role='dialog']",
 ];
 
-export function extractContent(): string {
-  const clone = document.body.cloneNode(true) as HTMLElement;
-  excludeSelectors.forEach((sel) => {
-    clone.querySelectorAll(sel).forEach((el) => el.remove());
-  });
-
-  if (!clone) return "";
-
-  return htmlToMarkdown(clone, false);
+export function extractContent(minY: number, maxY: number): string {
+  return htmlToMarkdown(document.body, true, minY, maxY);
 }
 
 function htmlToMarkdown(
@@ -53,12 +46,13 @@ function htmlToMarkdown(
 
     const el = node as HTMLElement;
     if (getComputedStyle(el).display === "none") continue;
-    // const rect = el.getBoundingClientRect();
-    // if (rect.width === 0 || rect.height === 0) continue;
+    if (excludeSelectors.some((sel) => el.matches(sel))) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
 
-    // const absTop = rect.top + window.scrollY;
-    // const absBottom = absTop + rect.height;
-    // if (absBottom < minY || absTop > maxY) continue;
+    const absTop = rect.top + window.scrollY;
+    const absBottom = absTop + rect.height;
+    if (absBottom < minY || absTop > maxY) continue;
 
     const tag = el.tagName.toLowerCase();
     const inner = htmlToMarkdown(el, textContentOnly, minY, maxY).trim();

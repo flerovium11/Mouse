@@ -33,6 +33,12 @@ export type PageContext = {
 
   /** Meaningful page content extracted from DOM */
   content: string;
+
+  /** At which y position relative to the entire page height the content starts and ends (0-1) */
+  contentBounds?: {
+    start: number;
+    end: number;
+  };
 };
 
 /**
