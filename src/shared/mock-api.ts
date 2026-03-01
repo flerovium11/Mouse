@@ -30,7 +30,7 @@ export async function gen(
   const res = await fetch(`${BASE}/gen`, {
     method: "POST",
     headers: headers(uuid),
-    body: JSON.stringify({ pageMetadata: ctx.pageMetadata, conten: ctx.content, element, recentActions }),
+    body: JSON.stringify({ pageMetadata: ctx.pageMetadata, content: ctx.content, element, recentActions }),
   });
   const { suggestions } = await res.json();
   return suggestions as Suggestion[];
