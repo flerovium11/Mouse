@@ -8,7 +8,7 @@ import {
   PageContext,
   RequestCompletionMessage,
 } from "@shared/types";
-import { register, dump, gen } from "@shared/api";
+import { register, dump, gen } from "@shared/mock-api";
 
 console.info("Background service worker started");
 
@@ -41,9 +41,16 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
       break;
     case MessageType.PAGE_CONTEXT:
       pageContexts.set(tabId, { ...msg.pageContext, tabId, frameId });
-      getUuid().then((id) => dump(id, msg.pageContext)).catch(console.error);
+      console.log(msg.pageContext.content);
+      getUuid()
+        .then((id) => dump(id, msg.pageContext))
+        .catch(console.error);
       break;
     case MessageType.REQUEST_COMPLETION:
+      console.log(
+        "Received completion request:",
+        msg.completionContext.element.surroundings,
+      );
       handleCompletionRequest(msg, tabId, sendResponse);
       break;
   }
@@ -58,11 +65,20 @@ async function handleCompletionRequest(
 ): Promise<void> {
   try {
     const id = await getUuid();
-    const ctx = pageContexts.get(tabId) ?? { ...msg.completionContext, chunks: [] };
-    const suggestions = await gen(id, ctx, msg.completionContext.element, [...domActions]);
+    const ctx = pageContexts.get(tabId) ?? {
+      ...msg.completionContext,
+      content: "",
+    };
+    const suggestions = await gen(id, ctx, msg.completionContext.element, [
+      ...domActions,
+    ]);
     sendResponse({ type: MessageType.COMPLETION_RESULT, suggestions });
   } catch (error) {
     console.error("Error handling completion request:", error);
-    sendResponse({ type: MessageType.COMPLETION_RESULT, error: (error as Error).message, suggestions: [] });
+    sendResponse({
+      type: MessageType.COMPLETION_RESULT,
+      error: (error as Error).message,
+      suggestions: [],
+    });
   }
 }

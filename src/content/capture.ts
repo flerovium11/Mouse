@@ -1,6 +1,6 @@
-import { extractChunks, getSurroundings } from "./extraction";
+import { extractContent, getSurroundings } from "./extraction";
 import { GhostText } from "./ghost";
-import { currentPage, isTextInput, toPageElement } from "./utils";
+import { currentPageMetadata, isTextInput, toPageElement } from "./utils";
 import {
   CompletionContext,
   CompletionResultMessage,
@@ -35,8 +35,8 @@ function onFocusOut(e: FocusEvent) {
 function sendPageContext() {
   const pageContext: PageContext = {
     timestamp: Date.now(),
-    page: currentPage(),
-    chunks: extractChunks(),
+    pageMetadata: currentPageMetadata(),
+    content: extractContent(),
   };
 
   chrome.runtime.sendMessage({
@@ -53,7 +53,7 @@ function sendDOMActionMessage(
     action: {
       ...action,
       id: crypto.randomUUID(),
-      pageMetadata: currentPage(),
+      pageMetadata: currentPageMetadata(),
       timestamp: Date.now(),
     },
   } as DOMActionMessage);
@@ -89,7 +89,7 @@ function onInput(e: Event) {
     if (!value.trim()) return;
     const completionContext: CompletionContext = {
       timestamp: Date.now(),
-      pageMetadata: currentPage(),
+      pageMetadata: currentPageMetadata(),
       element: toPageElement(input, true),
     };
 
@@ -123,6 +123,8 @@ function onKeyDown(e: KeyboardEvent) {
 
 function onScroll() {
   ghost.syncPosition();
+
+  const storageKey = `scroll_${location.href}`;
 }
 
 function onUrlChange(lastUrl: string) {

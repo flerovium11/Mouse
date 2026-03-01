@@ -5,8 +5,8 @@
     "moduleDetection": "force",
     "moduleResolution": "bundler",
     "strict": true,
-    "lib": ["ES2022", "DOM"],
-    "types": ["chrome"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["chrome", "vite/client"],
     "paths": {
       "@shared/*": ["./src/shared/*"]
     },

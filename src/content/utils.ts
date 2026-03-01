@@ -67,7 +67,7 @@ export function toPageElement(
   };
 }
 
-export function currentPage(): PageMetadata {
+export function currentPageMetadata(): PageMetadata {
   return {
     url: window.location.href,
     title: document.title,

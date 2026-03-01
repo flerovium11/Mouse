@@ -1,180 +1,171 @@
-// Basic content extraction experiment
+const excludeSelectors = [
+  "script",
+  "noscript",
+  "canvas",
+  "style",
+  "head",
+  "header",
+  "footer",
+  "nav",
+  "aside",
+  "#header",
+  "#footer",
+  "#sidebar",
+  ".ads",
+  ".advertisement",
+  ".cookie-consent",
+  ".cookie-notice",
+  ".cookie-consent-banner",
+  ".cookie-banner",
+  ".newsletter-signup",
+  "[aria-hidden='true']",
+  "[hidden]",
+  "[role='alertdialog']",
+  "[role='dialog']",
+];
 
-import { PageChunk } from "@shared/types";
-
-const INTERACTIVE_TAGS = new Set([
-  "INPUT",
-  "SELECT",
-  "TEXTAREA",
-  "BUTTON",
-  "A",
-]);
-const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "SVG"]);
-const MAX_CHUNK_SIZE = 700;
-
-/** When splitting, look this many chars beyond the limit for a sentence boundary */
-const BOUNDARY_EXTRA = 100;
-
-// Collect inner text of a subtree, skipping hidden/script nodes
-function innerText(el: HTMLElement): string {
-  const parts: string[] = [];
-  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) {
-      const parent = (n as Text).parentElement!;
-      if (SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
-      if (getComputedStyle(parent).display === "none")
-        return NodeFilter.FILTER_REJECT;
-      const t = n.textContent?.trim() ?? "";
-      return t.length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
-    },
+export function extractContent(): string {
+  const clone = document.body.cloneNode(true) as HTMLElement;
+  excludeSelectors.forEach((sel) => {
+    clone.querySelectorAll(sel).forEach((el) => el.remove());
   });
-  let n: Node | null;
-  while ((n = w.nextNode())) parts.push(n.textContent!.trim());
-  return parts.join(" ");
+
+  if (!clone) return "";
+
+  return htmlToMarkdown(clone, false);
 }
 
-export function extractChunks(): PageChunk[] {
-  const chunks: PageChunk[] = [];
-  let current = "";
-  let i = 0;
+function htmlToMarkdown(
+  element: HTMLElement | ChildNode,
+  textContentOnly: boolean = true,
+  minY: number = 0,
+  maxY: number = Infinity,
+): string {
+  let result = "";
 
-  function flush(force = false) {
-    if (current.length > MAX_CHUNK_SIZE) {
-      const searchStr = current.slice(0, MAX_CHUNK_SIZE + BOUNDARY_EXTRA);
-
-      const match = [...searchStr.matchAll(/[.!?]\s+/g)].at(-1);
-      const splitAt =
-        match && match.index! > 100
-          ? match.index! + match[0].length // split after the whitespace
-          : MAX_CHUNK_SIZE;
-
-      chunks.push({
-        id: `${location.href}#chunk${i++}`,
-        content: current.slice(0, splitAt).trim(),
-      });
-      current = current.slice(splitAt);
-    } else if (force && current.trim().length > 30) {
-      chunks.push({
-        id: `${location.href}#chunk${i++}`,
-        content: current.trim(),
-      });
-      current = "";
+  for (const node of element.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      result += node.textContent;
+      continue;
     }
-  }
 
-  function append(text: string) {
-    if (!text) return;
-    current += " " + text;
-    flush();
-  }
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
-  const visited = new WeakSet<Node>();
+    const el = node as HTMLElement;
+    if (getComputedStyle(el).display === "none") continue;
+    // const rect = el.getBoundingClientRect();
+    // if (rect.width === 0 || rect.height === 0) continue;
 
-  const walker = document.createTreeWalker(
-    document.body,
-    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-    {
-      acceptNode(node) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const el = node as HTMLElement;
-          if (SKIP_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT;
-          if (getComputedStyle(el).display === "none")
-            return NodeFilter.FILTER_REJECT;
+    // const absTop = rect.top + window.scrollY;
+    // const absBottom = absTop + rect.height;
+    // if (absBottom < minY || absTop > maxY) continue;
 
-          const isInteractive =
-            INTERACTIVE_TAGS.has(el.tagName) ||
-            el.onclick !== null ||
-            el.getAttribute("role") === "button";
+    const tag = el.tagName.toLowerCase();
+    const inner = htmlToMarkdown(el, textContentOnly, minY, maxY).trim();
 
-          if (isInteractive) {
-            // Accept the element itself, but mark its descendants so text
-            // nodes inside don't get double-emitted
-            const descendants = el.querySelectorAll("*");
-            visited.add(el);
-            descendants.forEach((d) => visited.add(d));
-            return NodeFilter.FILTER_ACCEPT;
-          }
-
-          return NodeFilter.FILTER_SKIP;
-        }
-
-        // Text node — skip if already captured by a parent interactive element
-        if (visited.has((node as Text).parentElement!))
-          return NodeFilter.FILTER_SKIP;
-
-        const el = (node as Text).parentElement!;
-        if (SKIP_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT;
-        if (getComputedStyle(el).display === "none")
-          return NodeFilter.FILTER_REJECT;
-        const text = node.textContent?.trim() ?? "";
-        return text.length > 10
-          ? NodeFilter.FILTER_ACCEPT
-          : NodeFilter.FILTER_SKIP;
-      },
-    },
-  );
-
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    append(nodeToString(node));
-  }
-
-  flush(true);
-  return chunks;
-}
-
-function nodeToString(node: Node): string {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent?.trim() || "";
-  }
-
-  if (node instanceof HTMLInputElement) {
-    const hint = node.placeholder || node.ariaLabel || node.name || "";
-    switch (node.type) {
-      case "checkbox":
-        return `[${node.checked ? "x" : " "}] ${hint}`;
-      case "radio":
-        return `(${node.checked ? "•" : " "}) ${hint}`;
-      case "submit":
-      case "button":
-        return `[btn: ${node.value || hint}]`;
+    switch (tag) {
+      case "h1":
+        result += `# ${inner}\n\n`;
+        break;
+      case "h2":
+        result += `## ${inner}\n\n`;
+        break;
+      case "h3":
+        result += `### ${inner}\n\n`;
+        break;
+      case "h4":
+        result += `#### ${inner}\n\n`;
+        break;
+      case "h5":
+        result += `##### ${inner}\n\n`;
+        break;
+      case "h6":
+        result += `###### ${inner}\n\n`;
+        break;
+      case "p":
+        result += `${inner}\n\n`;
+        break;
+      case "br":
+        result += `\n`;
+        break;
+      case "strong":
+      case "b":
+        result += `**${inner}**`;
+        break;
+      case "em":
+      case "i":
+        result += `*${inner}*`;
+        break;
+      case "s":
+      case "del":
+        result += `~~${inner}~~`;
+        break;
+      case "code":
+        result += `\`${inner}\``;
+        break;
+      case "pre":
+        result += `\`\`\`\n${el.textContent}\n\`\`\`\n\n`;
+        break;
+      case "blockquote":
+        result +=
+          inner
+            .split("\n")
+            .map((l: string) => `> ${l}`)
+            .join("\n") + "\n\n";
+        break;
+      case "a": {
+        if (textContentOnly) result += inner;
+        const href = el.getAttribute("href") ?? "";
+        result += `[${inner}](${href.slice(0, 30)})`;
+        break;
+      }
+      case "img": {
+        if (textContentOnly) break;
+        const src = el.getAttribute("src") ?? "";
+        const alt = el.getAttribute("alt") ?? "";
+        result += `![${alt}](${src})`;
+        break;
+      }
+      case "ul": {
+        el.querySelectorAll<HTMLLIElement>(":scope > li").forEach((li) => {
+          result += `- ${htmlToMarkdown(li, textContentOnly, minY, maxY).trim()}\n`;
+        });
+        result += "\n";
+        break;
+      }
+      case "ol": {
+        let i = 1;
+        el.querySelectorAll<HTMLLIElement>(":scope > li").forEach((li) => {
+          result += `${i++}. ${htmlToMarkdown(li, textContentOnly, minY, maxY).trim()}\n`;
+        });
+        result += "\n";
+        break;
+      }
+      case "hr":
+        result += `---\n\n`;
+        break;
+      case "table": {
+        const rows = [...el.querySelectorAll<HTMLTableRowElement>("tr")];
+        rows.forEach((row, rowIdx) => {
+          const cells = [
+            ...row.querySelectorAll<HTMLTableCellElement>("th, td"),
+          ].map((c) => htmlToMarkdown(c, textContentOnly, minY, maxY).trim());
+          result += `| ${cells.join(" | ")} |\n`;
+          if (rowIdx === 0)
+            result += `| ${cells.map(() => "---").join(" | ")} |\n`;
+        });
+        result += "\n";
+        break;
+      }
       default:
-        return `[input: ${hint}${node.value ? ` = "${node.value}"` : ""}]`;
+        result += inner;
     }
   }
 
-  if (node instanceof HTMLSelectElement) {
-    const selected = node.options[node.selectedIndex]?.text ?? "";
-    const options = Array.from(node.options)
-      .map((o) => o.text)
-      .join(" | ");
-    return `[select: ${selected} | ${options}]`;
-  }
-
-  if (node instanceof HTMLTextAreaElement) {
-    const hint = node.placeholder || node.ariaLabel || node.name || "";
-    return `[textarea: ${hint}${node.value ? ` = "${node.value}"` : ""}]`;
-  }
-
-  if (node instanceof HTMLButtonElement) {
-    const label = innerText(node) || node.ariaLabel || node.name || "";
-    return label.length > 3 ? `[btn: ${label}]` : "";
-  }
-
-  if (node instanceof HTMLAnchorElement) {
-    const label = innerText(node) || node.ariaLabel || "";
-    return label.length > 3 ? `[link: ${label}]` : "";
-  }
-
-  if (
-    node instanceof HTMLElement &&
-    (node.onclick || node.getAttribute("role") === "button")
-  ) {
-    const label = node.getAttribute("aria-label") || innerText(node) || "";
-    return label.length > 3 ? `[clickable: ${label}]` : "";
-  }
-
-  return node.textContent?.trim() || "";
+  return result
+    .replace(/\n{3,}/g, "\n\n") // max 2 consecutive newlines
+    .replace(/[ \t]+/g, " ") // collapse spaces/tabs
+    .trim();
 }
 
 export function getSurroundings(el: HTMLElement): string {
@@ -251,6 +242,24 @@ export function getSurroundings(el: HTMLElement): string {
   return parts.join("\n");
 }
 
+function innerText(el: HTMLElement): string {
+  const parts: string[] = [];
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      const parent = (n as Text).parentElement!;
+      if (excludeSelectors.some((sel) => parent.matches(sel)))
+        return NodeFilter.FILTER_REJECT;
+      if (getComputedStyle(parent).display === "none")
+        return NodeFilter.FILTER_REJECT;
+      const t = n.textContent?.trim() ?? "";
+      return t.length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    },
+  });
+  let n: Node | null;
+  while ((n = w.nextNode())) parts.push(n.textContent!.trim());
+  return parts.join(" ");
+}
+
 function resolveLabel(el: HTMLElement): string {
   if (el.id) {
     const explicit = document.querySelector<HTMLLabelElement>(
@@ -300,7 +309,7 @@ function getNearestPrecedingText(el: HTMLElement): string {
   while (node) {
     let sib = node.previousElementSibling;
     while (sib) {
-      if (SKIP_TAGS.has((sib as HTMLElement).tagName)) {
+      if (excludeSelectors.some((sel) => sib?.matches(sel))) {
         sib = sib.previousElementSibling;
         continue;
       }

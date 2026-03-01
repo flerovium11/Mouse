@@ -20,12 +20,6 @@ export type PageElement = {
   surroundings?: string; // text content around the focused element, for additional context
 };
 
-/**A chunk of text content from a page */
-export type PageChunk = {
-  id: string;
-  content: string;
-};
-
 /**
  * Page context sent from content script to background
  * when page loads and when navigation occurs
@@ -38,7 +32,7 @@ export type PageContext = {
   frameId?: number;
 
   /** Meaningful page content extracted from DOM */
-  chunks: PageChunk[];
+  content: string;
 };
 
 /**

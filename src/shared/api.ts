@@ -17,7 +17,10 @@ export async function dump(uuid: string, ctx: PageContext): Promise<void> {
   await fetch(`${BASE}/dump`, {
     method: "POST",
     headers: headers(uuid),
-    body: JSON.stringify({ pageMetadata: ctx.pageMetadata, chunks: ctx.chunks }),
+    body: JSON.stringify({
+      pageMetadata: ctx.pageMetadata,
+      content: ctx.content,
+    }),
   });
 }
 
@@ -30,7 +33,12 @@ export async function gen(
   const res = await fetch(`${BASE}/gen`, {
     method: "POST",
     headers: headers(uuid),
-    body: JSON.stringify({ pageMetadata: ctx.pageMetadata, chunks: ctx.chunks, element, recentActions }),
+    body: JSON.stringify({
+      pageMetadata: ctx.pageMetadata,
+      content: ctx.content,
+      element,
+      recentActions,
+    }),
   });
   const { suggestions } = await res.json();
   return suggestions as Suggestion[];
