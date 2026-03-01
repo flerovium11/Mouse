@@ -5,9 +5,8 @@
 import { type TextInput } from "./types";
 import { getCursorPos, getValue, isNativeInput } from "./utils";
 
-const GHOST_COLOR = "rgba(0,0,0,0.38)";
-
 const COPIED_STYLES: (keyof CSSStyleDeclaration)[] = [
+  "color",
   "fontFamily",
   "fontSize",
   "fontWeight",
@@ -120,7 +119,7 @@ export class GhostText {
     invisible.textContent = before.endsWith("\n") ? before + "\u200B" : before;
 
     const ghost = document.createElement("span");
-    ghost.style.color = GHOST_COLOR;
+    ghost.style.opacity = "0.38";
     ghost.textContent = this.suggestion;
 
     this.overlay.replaceChildren(invisible, ghost);
