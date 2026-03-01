@@ -2,6 +2,7 @@ import dotenv
 dotenv.load_dotenv()
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import sys
 import json
 import uuid as uuid_lib
@@ -20,6 +21,7 @@ from models import (
     RegisterResponse, GenResponse,
     Suggestion,
 )
+from ratelimit import dump_limiter, gen_limiter
 
 # --- Config ---
 
@@ -38,6 +40,13 @@ GENERATION_MODEL = "gemini-2.5-flash-lite"
 # --- Singletons ---
 
 app = FastAPI(title="Mouse API", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 qdrant = QdrantClient(":memory:")
 gemini_client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 
@@ -67,9 +76,13 @@ def _ensure_collection(user_id: str):
 
 
 def _get_user_id(x_user_id: Optional[str]) -> str:
-    """Validate the X-User-Id header."""
-    if not x_user_id or x_user_id not in registered_users:
-        raise HTTPException(status_code=401, detail="Invalid or missing X-User-Id header")
+    """Validate the X-User-Id header and auto-register if needed."""
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="Missing X-User-Id header")
+    # Auto-register users that were registered before a server restart
+    if x_user_id not in registered_users:
+        registered_users.add(x_user_id)
+        _ensure_collection(x_user_id)
     return x_user_id
 
 
@@ -83,7 +96,7 @@ def _embed_texts(texts: List[str]) -> list:
 
 
 def generate_summary_prompt(website_text: str) -> str:
-    return SUMMARY_PROMPT.format(website_text)
+    return SUMMARY_PROMPT.replace("{}", website_text)
 
 
 def extract_snippets(website_text: str) -> list[str]:
@@ -117,6 +130,7 @@ async def register():
 async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None)):
     """Store a visited page's chunks in the user's vector DB collection."""
     user_id = _get_user_id(x_user_id)
+    dump_limiter.check(user_id)
     col_name = _collection_name(user_id)
     _ensure_collection(user_id)
 
@@ -157,6 +171,7 @@ async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None)):
 async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
     """Generate autocomplete suggestions for the current element."""
     user_id = _get_user_id(x_user_id)
+    gen_limiter.check(user_id)
     col_name = _collection_name(user_id)
     _ensure_collection(user_id)
 
@@ -196,31 +211,37 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
     ) or "No page content available."
 
     # Format recent actions
+    recent = body.recentActions or []
+    print(f"Recent actions: {len(recent)}")
     actions_text = "\n".join(
         f"- [{a.type.value}] on {a.pageMetadata.title} ({a.pageMetadata.url})"
         + (f" element: {a.element.tag}" if a.element else "")
-        for a in body.recentActions
+        for a in recent
     ) or "No recent actions."
 
     # Build the prompt
-    prompt = GEN_PROMPT.format(
-        url=body.pageMetadata.url,
-        title=body.pageMetadata.title,
-        domain=body.pageMetadata.domain,
-        chunks=chunks_text,
-        history_context=history_context,
-        tag=element.tag,
-        element_type=element.type or "N/A",
-        label=element.label or "N/A",
-        placeholder=element.placeholder or "N/A",
-        name_attr=element.nameAttr or "N/A",
-        aria_label=element.ariaLabel or "N/A",
-        value=element.value or "",
-        cursor_position=element.cursorPosition if element.cursorPosition is not None else "N/A",
-        surroundings=element.surroundings or "N/A",
-        recent_actions=actions_text,
-    )
+    replacements = {
+        "{url}": body.pageMetadata.url,
+        "{title}": body.pageMetadata.title,
+        "{domain}": body.pageMetadata.domain,
+        "{chunks}": chunks_text,
+        "{history_context}": history_context,
+        "{tag}": element.tag,
+        "{element_type}": element.type or "N/A",
+        "{label}": element.label or "N/A",
+        "{placeholder}": element.placeholder or "N/A",
+        "{name_attr}": element.nameAttr or "N/A",
+        "{aria_label}": element.ariaLabel or "N/A",
+        "{value}": element.value or "",
+        "{cursor_position}": str(element.cursorPosition) if element.cursorPosition is not None else "N/A",
+        "{surroundings}": element.surroundings or "N/A",
+        "{recent_actions}": actions_text,
+    }
+    prompt = GEN_PROMPT
+    for key, val in replacements.items():
+        prompt = prompt.replace(key, val)
 
+    print(f"Generated prompt for Gemini:\n{prompt}\n---")
     # Generate suggestions with Gemini
     response = gemini_client.models.generate_content(
         model=GENERATION_MODEL,
@@ -231,6 +252,7 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
             top_k=40,
         ),
     )
+    print(f"Raw response from Gemini:\n{response.text}\n---")
 
     raw = response.text.replace("```json", "").replace("```", "").strip()
     try:

@@ -1,7 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional, List
 from enum import Enum
-import uuid
 
 
 # --- Component Schemas ---
@@ -57,8 +56,8 @@ class SuggestionType(str, Enum):
 
 class Suggestion(BaseModel):
     text: str
-    confidence: float = Field(ge=0, le=1)
-    type: SuggestionType
+    confidence: float = 0.5
+    type: SuggestionType = SuggestionType.completion
 
 
 # --- Request Bodies ---
@@ -72,7 +71,7 @@ class GenRequest(BaseModel):
     pageMetadata: PageMetadata
     chunks: List[PageChunk]
     element: PageElement
-    recentActions: List[DOMAction]
+    recentActions: Optional[List[DOMAction]] = None
 
 
 # --- Response Bodies ---

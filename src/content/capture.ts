@@ -35,7 +35,7 @@ function onFocusOut(e: FocusEvent) {
 function sendPageContext() {
   const pageContext: PageContext = {
     timestamp: Date.now(),
-    page: currentPage(),
+    pageMetadata: currentPage(),
     chunks: extractChunks(),
   };
 
