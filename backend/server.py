@@ -14,7 +14,7 @@ sys.path.append('.')
 from google import genai
 from google.genai import types
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import Distance, PointStruct, VectorParams, Filter, FieldCondition, MatchValue, FilterSelector
 
 from models import (
     DumpRequest, GenRequest,
@@ -88,11 +88,14 @@ def _get_user_id(x_user_id: Optional[str]) -> str:
 
 def _embed_texts(texts: List[str]) -> list:
     """Embed a list of texts using Gemini."""
-    results = gemini_client.models.embed_content(
-        model=EMBEDDING_MODEL,
-        contents=texts,
-    )
-    return results.embeddings
+    embeds = []
+    for i in range(0, len(texts), 100):  # Batch in groups of 10 to avoid Gemini limits
+        results = gemini_client.models.embed_content(
+            model=EMBEDDING_MODEL,
+            contents=texts[i:i+100],
+        )
+        embeds.extend(results.embeddings)
+    return embeds
 
 
 def generate_summary_prompt(website_text: str) -> str:
@@ -135,32 +138,37 @@ async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None)):
     _ensure_collection(user_id)
 
     # Build texts to embed: prepend page metadata for richer context
-    meta_prefix = f"{body.pageMetadata.title} | {body.pageMetadata.domain} | {body.pageMetadata.url}"
-    texts = [f"{meta_prefix}\n{chunk.content}" for chunk in body.chunks]
+    texts = [body.content[i:i+225] for i in range(0, len(body.content), 200)]
 
     if not texts:
         return {"status": "ok", "stored": 0}
 
-    embeddings = _embed_texts(texts)
+    # Invalidate old points for this page before replacing
+    qdrant.delete(
+        collection_name=col_name,
+        points_selector=FilterSelector(
+            filter=Filter(
+                must=[FieldCondition(key="url", match=MatchValue(value=body.pageMetadata.url))]
+            )
+        ),
+    )
 
-    # Get current max id in collection to avoid collisions
-    col_info = qdrant.get_collection(col_name)
-    offset = col_info.points_count
+    embeddings = _embed_texts(texts)
 
     points = [
         PointStruct(
-            id=offset + idx,
+            id=str(uuid_lib.uuid4()),
             vector=emb.values,
             payload={
-                "chunk_id": chunk.id,
-                "content": chunk.content,
+                "chunk_id": hash(chunk),  # Simple chunk ID based on content hash
+                "content": chunk,
                 "url": body.pageMetadata.url,
                 "title": body.pageMetadata.title,
                 "domain": body.pageMetadata.domain,
                 "description": body.pageMetadata.description or "",
             },
         )
-        for idx, (emb, chunk) in enumerate(zip(embeddings, body.chunks))
+        for emb, chunk in zip(embeddings, texts)
     ]
 
     qdrant.upsert(collection_name=col_name, points=points)
@@ -177,15 +185,14 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
 
     # Build a query from the element context + page chunks
     element = body.element
-    query_parts = [
-        body.pageMetadata.title,
-        body.pageMetadata.domain,
-        element.label or "",
-        element.placeholder or "",
-        element.value or "",
-        element.surroundings or "",
-    ]
-    query_text = " ".join(p for p in query_parts if p)
+    #query_parts = [
+    #    body.pageMetadata.title,
+    #    element.label or "",
+    #    element.value or "",
+    #    element.placeholder or "",
+    #    element.value or ""
+    #]
+    query_text = f"""{element.value or "N/A"}"""
 
     # Retrieve relevant history from the vector DB
     history_context = ""
@@ -195,7 +202,7 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
         search_results = qdrant.query_points(
             collection_name=col_name,
             query=query_embedding.values,
-            limit=5,
+            limit=20,
         )
         history_snippets = [
             f"- [{pt.payload.get('title', '')}] {pt.payload.get('content', '')}"
@@ -206,9 +213,7 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
         history_context = "No browsing history stored yet."
 
     # Format page chunks
-    chunks_text = "\n".join(
-        f"- {chunk.content}" for chunk in body.chunks
-    ) or "No page content available."
+    chunks_text = body.content or "No page content available."
 
     # Format recent actions
     recent = body.recentActions or []

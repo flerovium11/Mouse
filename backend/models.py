@@ -64,12 +64,12 @@ class Suggestion(BaseModel):
 
 class DumpRequest(BaseModel):
     pageMetadata: PageMetadata
-    chunks: List[PageChunk]
+    content: str
 
 
 class GenRequest(BaseModel):
     pageMetadata: PageMetadata
-    chunks: List[PageChunk]
+    content: str
     element: PageElement
     recentActions: Optional[List[DOMAction]] = None
 
