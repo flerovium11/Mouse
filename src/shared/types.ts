@@ -1,6 +1,6 @@
 // Types used across the project
 
-export type Page = {
+export type PageMetadata = {
   url: string;
   title: string;
   description?: string;
@@ -33,7 +33,7 @@ export type PageChunk = {
  */
 export type PageContext = {
   timestamp: number;
-  page: Page;
+  pageMetadata: PageMetadata;
   tabId?: number;
   frameId?: number;
 
@@ -47,10 +47,11 @@ export type PageContext = {
  */
 export type CompletionContext = {
   timestamp: number;
-  page: Page;
+  pageMetadata: PageMetadata;
   tabId?: number;
   frameId?: number;
   element: PageElement;
+  recentActions?: DOMAction[];
 };
 
 export type DOMAction = {
@@ -58,7 +59,7 @@ export type DOMAction = {
   timestamp: number;
   tabId?: number;
   frameId?: number;
-  page: Page;
+  pageMetadata: PageMetadata;
   element?: PageElement;
   type: "change" | "click" | "navigation" | "other";
   lastUrl?: string; // for navigation events

@@ -1,0 +1,178 @@
+openapi: 3.0.0
+info:
+  title: Mouse API
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:3000
+
+security:
+  - userId: []
+
+paths:
+  /register:
+    post:
+      summary: Register a new user
+      security: []
+      responses:
+        '200':
+          description: New user UUID
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uuid]
+                properties:
+                  uuid:
+                    type: string
+                    format: uuid
+
+  /dump:
+    post:
+      summary: Store a visited page in the vector DB
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pageMetadata, chunks]
+              properties:
+                pageMetadata:
+                  $ref: '#/components/schemas/PageMetadata'
+                chunks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PageChunk'
+      responses:
+        '200':
+          description: OK
+
+  /gen:
+    post:
+      summary: Generate autocomplete suggestions for the current element
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pageMetadata, chunks, element, recentActions]
+              properties:
+                pageMetadata:
+                  $ref: '#/components/schemas/PageMetadata'
+                chunks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PageChunk'
+                element:
+                  $ref: '#/components/schemas/PageElement'
+                recentActions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DOMAction'
+      responses:
+        '200':
+          description: Autocomplete suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions]
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Suggestion'
+
+components:
+  securitySchemes:
+    userId:
+      type: apiKey
+      in: header
+      name: X-User-Id
+
+  schemas:
+    PageMetadata:
+      type: object
+      required: [url, title, domain]
+      properties:
+        url:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        domain:
+          type: string
+
+    PageChunk:
+      type: object
+      required: [id, content]
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+
+    PageElement:
+      type: object
+      required: [tag]
+      properties:
+        tag:
+          type: string
+        type:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        cursorPosition:
+          type: integer
+        textContent:
+          type: string
+        placeholder:
+          type: string
+        nameAttr:
+          type: string
+        ariaLabel:
+          type: string
+        surroundings:
+          type: string
+
+    DOMAction:
+      type: object
+      required: [id, timestamp, pageMetadata, type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        timestamp:
+          type: integer
+        tabId:
+          type: integer
+        frameId:
+          type: integer
+        pageMetadata:
+          $ref: '#/components/schemas/PageMetadata'
+        element:
+          $ref: '#/components/schemas/PageElement'
+        type:
+          type: string
+          enum: [change, click, navigation, other]
+        lastUrl:
+          type: string
+
+    Suggestion:
+      type: object
+      required: [text, confidence, type]
+      properties:
+        text:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        type:
+          type: string
+          enum: [completion, correction, enhancement]
