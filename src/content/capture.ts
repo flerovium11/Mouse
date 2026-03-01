@@ -46,14 +46,14 @@ function sendPageContext() {
 }
 
 function sendDOMActionMessage(
-  action: Omit<DOMAction, "timestamp" | "page" | "id">,
+  action: Omit<DOMAction, "timestamp" | "pageMetadata" | "id">,
 ) {
   chrome.runtime.sendMessage({
     type: MessageType.DOM_ACTION,
     action: {
       ...action,
       id: crypto.randomUUID(),
-      page: currentPage(),
+      pageMetadata: currentPage(),
       timestamp: Date.now(),
     },
   } as DOMActionMessage);
@@ -89,7 +89,7 @@ function onInput(e: Event) {
     if (!value.trim()) return;
     const completionContext: CompletionContext = {
       timestamp: Date.now(),
-      page: currentPage(),
+      pageMetadata: currentPage(),
       element: toPageElement(input, true),
     };
 

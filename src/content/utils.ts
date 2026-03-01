@@ -1,4 +1,4 @@
-import { Page, PageElement } from "@shared/types";
+import { PageMetadata, PageElement } from "@shared/types";
 import { getSurroundings } from "./extraction";
 
 export function isNativeInput(
@@ -67,7 +67,7 @@ export function toPageElement(
   };
 }
 
-export function currentPage(): Page {
+export function currentPage(): PageMetadata {
   return {
     url: window.location.href,
     title: document.title,

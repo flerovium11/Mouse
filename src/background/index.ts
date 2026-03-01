@@ -5,14 +5,30 @@ import {
   DOMAction,
   Message,
   MessageType,
+  PageContext,
   RequestCompletionMessage,
 } from "@shared/types";
-import { getSuggestions } from "./agent";
+import { register, dump, gen } from "@shared/api";
 
 console.info("Background service worker started");
 
-// Will be cleared every time the service worker goes to sleep
+const pageContexts = new Map<number, PageContext>();
 const domActions: DOMAction[] = [];
+let uuid: string | null = null;
+
+async function getUuid(): Promise<string> {
+  if (uuid) return uuid;
+  const stored = await chrome.storage.local.get("uuid");
+  if (stored["uuid"]) {
+    uuid = stored["uuid"] as string;
+    return uuid;
+  }
+  uuid = await register();
+  await chrome.storage.local.set({ uuid });
+  return uuid;
+}
+
+getUuid().catch(console.error);
 
 chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
   const tabId = sender.tab?.id ?? -1;
@@ -20,18 +36,15 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
 
   switch (msg.type) {
     case MessageType.DOM_ACTION:
-      console.log(`Received DOM action from tab ${tabId}:`, msg.action);
       domActions.push({ ...msg.action, tabId, frameId });
       if (domActions.length > 10) domActions.shift();
       break;
     case MessageType.PAGE_CONTEXT:
-      console.log(`Received page context from tab ${tabId}:`, msg.pageContext);
-      console.log(msg.pageContext.chunks.map((c) => c.content).join("\n---\n"));
+      pageContexts.set(tabId, { ...msg.pageContext, tabId, frameId });
+      getUuid().then((id) => dump(id, msg.pageContext)).catch(console.error);
       break;
     case MessageType.REQUEST_COMPLETION:
-      // get suggestions from agent and respond with results
-      console.log(`Received completion request from tab ${tabId}:`, msg);
-      handleCompletionRequest(msg, sendResponse);
+      handleCompletionRequest(msg, tabId, sendResponse);
       break;
   }
 
@@ -40,25 +53,16 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
 
 async function handleCompletionRequest(
   msg: RequestCompletionMessage,
+  tabId: number,
   sendResponse: (response: CompletionResultMessage) => void,
 ): Promise<void> {
   try {
-    const suggestions = await getSuggestions({
-      ...msg.completionContext,
-      recentActions: [...domActions],
-    });
-    const response: CompletionResultMessage = {
-      type: MessageType.COMPLETION_RESULT,
-      suggestions,
-    };
-    sendResponse(response);
+    const id = await getUuid();
+    const ctx = pageContexts.get(tabId) ?? { ...msg.completionContext, chunks: [] };
+    const suggestions = await gen(id, ctx, msg.completionContext.element, [...domActions]);
+    sendResponse({ type: MessageType.COMPLETION_RESULT, suggestions });
   } catch (error) {
     console.error("Error handling completion request:", error);
-    const response: CompletionResultMessage = {
-      type: MessageType.COMPLETION_RESULT,
-      error: (error as Error).message,
-      suggestions: [],
-    };
-    sendResponse(response);
+    sendResponse({ type: MessageType.COMPLETION_RESULT, error: (error as Error).message, suggestions: [] });
   }
 }
