@@ -51,6 +51,7 @@ export type CompletionContext = {
   tabId?: number;
   frameId?: number;
   element: PageElement;
+  recentActions?: DOMAction[];
 };
 
 export type DOMAction = {

@@ -22,6 +22,7 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
     case MessageType.DOM_ACTION:
       console.log(`Received DOM action from tab ${tabId}:`, msg.action);
       domActions.push({ ...msg.action, tabId, frameId });
+      if (domActions.length > 10) domActions.shift();
       break;
     case MessageType.PAGE_CONTEXT:
       console.log(`Received page context from tab ${tabId}:`, msg.pageContext);
@@ -42,7 +43,10 @@ async function handleCompletionRequest(
   sendResponse: (response: CompletionResultMessage) => void,
 ): Promise<void> {
   try {
-    const suggestions = await getSuggestions(msg.completionContext);
+    const suggestions = await getSuggestions({
+      ...msg.completionContext,
+      recentActions: [...domActions],
+    });
     const response: CompletionResultMessage = {
       type: MessageType.COMPLETION_RESULT,
       suggestions,
