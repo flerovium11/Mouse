@@ -14,7 +14,7 @@ sys.path.append('.')
 from google import genai
 from google.genai import types
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import Distance, PointStruct, VectorParams, Filter, FieldCondition, MatchValue, FilterSelector
 
 from models import (
     DumpRequest, GenRequest,
@@ -143,15 +143,21 @@ async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None)):
     if not texts:
         return {"status": "ok", "stored": 0}
 
-    embeddings = _embed_texts(texts)
+    # Invalidate old points for this page before replacing
+    qdrant.delete(
+        collection_name=col_name,
+        points_selector=FilterSelector(
+            filter=Filter(
+                must=[FieldCondition(key="url", match=MatchValue(value=body.pageMetadata.url))]
+            )
+        ),
+    )
 
-    # Get current max id in collection to avoid collisions
-    col_info = qdrant.get_collection(col_name)
-    offset = col_info.points_count
+    embeddings = _embed_texts(texts)
 
     points = [
         PointStruct(
-            id=offset + idx,
+            id=str(uuid_lib.uuid4()),
             vector=emb.values,
             payload={
                 "chunk_id": hash(chunk),  # Simple chunk ID based on content hash
@@ -162,7 +168,7 @@ async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None)):
                 "description": body.pageMetadata.description or "",
             },
         )
-        for idx, (emb, chunk) in enumerate(zip(embeddings, texts))
+        for emb, chunk in zip(embeddings, texts)
     ]
 
     qdrant.upsert(collection_name=col_name, points=points)
