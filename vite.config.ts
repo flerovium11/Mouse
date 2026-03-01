@@ -4,13 +4,12 @@ import { resolve } from "path";
 export default defineConfig({
   build: {
     outDir: "dist",
-    emptyOutDir: true,
+    emptyOutDir: false, // don't wipe the content build output during dev
     sourcemap: true, // allows debugging original .ts files during development
     minify: false, // keep readable during development
     rollupOptions: {
       input: {
         background: resolve(__dirname, "src/background/index.ts"),
-        content: resolve(__dirname, "src/content/index.ts"),
         popup: resolve(__dirname, "src/popup/popup.ts"),
       },
       output: {

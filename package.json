@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "description": "AI-powered smart autocomplete for any browser text field",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch",
+    "prebuild": "rimraf dist",
+    "build": "vite build && vite build --config vite.content.config.ts",
+    "dev": "concurrently \"vite build --watch\" \"vite build --config vite.content.config.ts --watch\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -18,6 +19,7 @@
   "devDependencies": {
     "@google/adk-devtools": "^0.4.0",
     "@types/chrome": "^0.0.260",
+    "concurrently": "^9.2.1",
     "esbuild": "^0.27.3",
     "ruvector": "^0.2.2",
     "typescript": "^5.9.3",

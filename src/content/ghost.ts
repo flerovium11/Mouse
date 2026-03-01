@@ -2,7 +2,8 @@
 // with invisible typed text followed by gray suggestion text — so the gray
 // text appears exactly at the cursor position.
 
-export type TextInput = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
+import { type TextInput } from "./types";
+import { getCursorPos, getValue, isNativeInput } from "./utils";
 
 const GHOST_COLOR = "rgba(0,0,0,0.38)";
 
@@ -31,28 +32,6 @@ const COPIED_STYLES: (keyof CSSStyleDeclaration)[] = [
   "wordBreak",
   "overflowWrap",
 ];
-
-function isNativeInput(el: HTMLElement): el is HTMLInputElement | HTMLTextAreaElement {
-  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
-}
-
-function getValue(el: HTMLElement): string {
-  if (isNativeInput(el)) return el.value ?? "";
-  return el.textContent ?? "";
-}
-
-function getCursorPos(el: HTMLElement): number {
-  if (isNativeInput(el)) return el.selectionStart ?? el.value.length;
-  // contenteditable: measure characters before the cursor via Selection API
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return getValue(el).length;
-  const range = sel.getRangeAt(0);
-  const pre = range.cloneRange();
-  pre.selectNodeContents(el);
-  pre.setEnd(range.startContainer, range.startOffset);
-  return pre.toString().length;
-}
-
 export class GhostText {
   private overlay: HTMLDivElement | null = null;
   private activeInput: HTMLElement | null = null;
@@ -93,7 +72,8 @@ export class GhostText {
 
     if (isNativeInput(input)) {
       const cursor = input.selectionStart ?? input.value.length;
-      input.value = input.value.slice(0, cursor) + accepted + input.value.slice(cursor);
+      input.value =
+        input.value.slice(0, cursor) + accepted + input.value.slice(cursor);
       const newCursor = cursor + accepted.length;
       input.setSelectionRange(newCursor, newCursor);
     } else {

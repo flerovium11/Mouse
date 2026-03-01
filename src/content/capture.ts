@@ -1,18 +1,20 @@
+import { extractChunks, getSurroundings } from "./extraction";
 import { GhostText } from "./ghost";
-import { getSuggestions } from "../background/agent";
+import { currentPage, isTextInput, toPageElement } from "./utils";
+import {
+  CompletionContext,
+  CompletionResultMessage,
+  DOMAction,
+  DOMActionMessage,
+  MessageType,
+  PageContext,
+  PageContextMessage,
+} from "@shared/types";
 
 export const ghost = new GhostText();
 
 const DEBOUNCE_MS = 500;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-function isTextInput(el: EventTarget | null): el is HTMLInputElement | HTMLTextAreaElement  {if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !(el instanceof HTMLElement && el.isContentEditable)) return false;
-if (el instanceof HTMLInputElement) {
-  const allowed = ["text", "search", "email", "url", "password", ""];
-  return allowed.includes(el.type);
-}
-return true;
-}
 
 function onFocusIn(e: FocusEvent) {
   if (isTextInput(e.target)) {
@@ -30,6 +32,47 @@ function onFocusOut(e: FocusEvent) {
   }
 }
 
+function sendPageContext() {
+  const pageContext: PageContext = {
+    timestamp: Date.now(),
+    page: currentPage(),
+    chunks: extractChunks(),
+  };
+
+  chrome.runtime.sendMessage({
+    type: MessageType.PAGE_CONTEXT,
+    pageContext,
+  } as PageContextMessage);
+}
+
+function sendDOMActionMessage(
+  action: Omit<DOMAction, "timestamp" | "page" | "id">,
+) {
+  chrome.runtime.sendMessage({
+    type: MessageType.DOM_ACTION,
+    action: {
+      ...action,
+      id: crypto.randomUUID(),
+      page: currentPage(),
+      timestamp: Date.now(),
+    },
+  } as DOMActionMessage);
+}
+
+function onChange(e: Event) {
+  sendDOMActionMessage({
+    type: "change",
+    element: toPageElement(e.target as HTMLElement, true),
+  });
+}
+
+function onClick(e: MouseEvent) {
+  sendDOMActionMessage({
+    type: "click",
+    element: toPageElement(e.target as HTMLElement, true),
+  });
+}
+
 function onInput(e: Event) {
   if (!isTextInput(e.target)) return;
   const input = e.target;
@@ -39,30 +82,29 @@ function onInput(e: Event) {
 
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    const value = "value" in input ? (input as HTMLInputElement).value : (input as HTMLElement).textContent ?? "";
+    const value =
+      "value" in input
+        ? (input as HTMLInputElement).value
+        : ((input as HTMLElement).textContent ?? "");
     if (!value.trim()) return;
-    const context: PageContext = {
+    const completionContext: CompletionContext = {
       timestamp: Date.now(),
-      tabId: 0,
-      page: {
-        url: window.location.href,
-        title: document.title,
-        domain: window.location.hostname,
-      },
-      element: {
-        tag: input.tagName.toLowerCase(),
-        type: input instanceof HTMLInputElement ? input.type : undefined,
-        label: (input.id ? document.querySelector(`label[for="${input.id}"]`)?.textContent?.trim() : undefined) ?? undefined,
-        placeholder: "placeholder" in input ? (input as HTMLInputElement).placeholder || undefined : undefined,
-        nameAttr: "name" in input ? (input as HTMLInputElement).name || undefined : undefined,
-        ariaLabel: input.getAttribute("aria-label") ?? undefined,
-      },
-      latestDomActions: [],
-      generatedDescription: "",
+      page: currentPage(),
+      element: toPageElement(input, true),
     };
-    getSuggestions(context).then(suggestions => {
-      if (suggestions.length > 0) ghost.show(suggestions[0]);
-    });
+
+    chrome.runtime.sendMessage(
+      { type: MessageType.REQUEST_COMPLETION, completionContext },
+      (response: CompletionResultMessage) => {
+        if (response.error) {
+          console.error("Error from background:", response.error);
+          return;
+        }
+
+        if (response.suggestions.length > 0)
+          ghost.show(response.suggestions[0].text);
+      },
+    );
   }, DEBOUNCE_MS);
 }
 
@@ -83,11 +125,37 @@ function onScroll() {
   ghost.syncPosition();
 }
 
+function onUrlChange(lastUrl: string) {
+  sendDOMActionMessage({
+    type: "navigation",
+    lastUrl,
+  });
+  sendPageContext();
+  ghost.clear();
+}
+
 export function initCapture(): void {
+  console.info("Initializing content script capture");
+
   document.addEventListener("focusin", onFocusIn);
   document.addEventListener("focusout", onFocusOut);
   document.addEventListener("input", onInput);
+  document.addEventListener("change", onChange);
+  document.addEventListener("click", onClick);
   document.addEventListener("keydown", onKeyDown, true); // capture phase so we get it before the page
   window.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener("resize", () => ghost.syncPosition());
+
+  let lastUrl = location.href;
+
+  const observer = new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      onUrlChange(lastUrl);
+      lastUrl = location.href;
+    }
+  });
+
+  observer.observe(document.body, { subtree: true, childList: true });
+
+  sendPageContext();
 }
