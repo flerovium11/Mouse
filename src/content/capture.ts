@@ -130,7 +130,6 @@ function onUrlChange(lastUrl: string) {
     type: "navigation",
     lastUrl,
   });
-  sendPageContext();
   ghost.clear();
 }
 
@@ -147,15 +146,62 @@ export function initCapture(): void {
   window.addEventListener("resize", () => ghost.syncPosition());
 
   let lastUrl = location.href;
+  // let dwellTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleSend() {
+    // if (dwellTimer) clearTimeout(dwellTimer);
+    // dwellTimer = setTimeout(() => {
+    //   sendPageContext();
+    // }, 3000);
+    waitForIdle(sendPageContext);
+  }
+
+  // document.addEventListener("visibilitychange", () => {
+  //   if (document.hidden && dwellTimer) {
+  //     clearTimeout(dwellTimer);
+  //     dwellTimer = null;
+  //   }
+  // });
 
   const observer = new MutationObserver(() => {
     if (location.href !== lastUrl) {
       onUrlChange(lastUrl);
       lastUrl = location.href;
+      scheduleSend();
     }
   });
 
   observer.observe(document.body, { subtree: true, childList: true });
 
-  sendPageContext();
+  scheduleSend();
+}
+
+function waitForIdle(callback: () => void, quietMs = 1000, timeout = 8000) {
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  const start = Date.now();
+
+  const observer = new MutationObserver(() => {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (Date.now() - start > timeout) {
+      observer.disconnect();
+      callback();
+      return;
+    }
+    idleTimer = setTimeout(() => {
+      observer.disconnect();
+      callback();
+    }, quietMs);
+  });
+
+  observer.observe(document.body, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+  });
+
+  // Fallback if page is already idle
+  idleTimer = setTimeout(() => {
+    observer.disconnect();
+    callback();
+  }, quietMs);
 }
