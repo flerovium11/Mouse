@@ -26,7 +26,7 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["*.mjs", "*.wasm"],
+      "resources": ["images/*"],
       "matches": ["<all_urls>"]
     }
   ]

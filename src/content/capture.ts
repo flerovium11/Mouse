@@ -203,8 +203,17 @@ function onUrlChange(lastUrl: string) {
   loadPageScrollFromSessionStorage();
 }
 
-export function initCapture(): void {
-  console.info("Initializing content script capture");
+function onResize() {
+  ghost.syncPosition();
+}
+
+let mutationObserver: MutationObserver | null = null;
+
+export function startCapture(): void {
+  console.info("The mouse is watching you 🐁");
+
+  currentMinY = window.scrollY;
+  currentMaxY = window.scrollY + window.innerHeight;
 
   document.addEventListener("focusin", onFocusIn);
   document.addEventListener("focusout", onFocusOut);
@@ -213,7 +222,7 @@ export function initCapture(): void {
   document.addEventListener("click", onClick);
   document.addEventListener("keydown", onKeyDown, true); // capture phase so we get it before the page
   window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", () => ghost.syncPosition());
+  window.addEventListener("resize", onResize);
 
   let lastUrl = location.href;
   // let dwellTimer: ReturnType<typeof setTimeout> | null = null;
@@ -233,7 +242,7 @@ export function initCapture(): void {
   //   }
   // });
 
-  const observer = new MutationObserver(() => {
+  mutationObserver = new MutationObserver(() => {
     if (location.href !== lastUrl) {
       onUrlChange(lastUrl);
       lastUrl = location.href;
@@ -241,10 +250,26 @@ export function initCapture(): void {
     }
   });
 
-  observer.observe(document.body, { subtree: true, childList: true });
+  mutationObserver.observe(document.body, { subtree: true, childList: true });
 
   loadPageScrollFromSessionStorage();
   scheduleNewUrlIdle();
+}
+
+export function stopCapture(): void {
+  console.info("The mouse is going to sleep 💤");
+
+  document.removeEventListener("focusin", onFocusIn);
+  document.removeEventListener("focusout", onFocusOut);
+  document.removeEventListener("input", onInput);
+  document.removeEventListener("change", onChange);
+  document.removeEventListener("click", onClick);
+  document.removeEventListener("keydown", onKeyDown, true);
+  window.removeEventListener("scroll", onScroll);
+  window.removeEventListener("resize", onResize);
+  ghost.detach();
+  mutationObserver?.disconnect();
+  mutationObserver = null;
 }
 
 function waitForIdle(callback: () => void, quietMs = 1000, timeout = 10_000) {

@@ -57,6 +57,9 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
       );
       handleCompletionRequest(msg, tabId, sendResponse);
       break;
+    case MessageType.GET_TAB_ID:
+      sendResponse({ type: MessageType.TAB_ID_RESPONSE, tabId });
+      break;
   }
 
   return true;

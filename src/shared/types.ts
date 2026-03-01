@@ -76,6 +76,8 @@ export enum MessageType {
   REQUEST_COMPLETION = "REQUEST_COMPLETION",
   COMPLETION_RESULT = "COMPLETION_RESULT",
   PAGE_CONTEXT = "PAGE_CONTEXT",
+  GET_TAB_ID = "GET_TAB_ID",
+  TAB_ID_RESPONSE = "TAB_ID_RESPONSE",
 }
 
 export type DOMActionMessage = {
@@ -99,8 +101,19 @@ export type PageContextMessage = {
   pageContext: PageContext;
 };
 
+export type GetTabIdMessage = {
+  type: MessageType.GET_TAB_ID;
+};
+
+export type TabIdResponseMessage = {
+  type: MessageType.TAB_ID_RESPONSE;
+  tabId: number;
+};
+
 export type Message =
   | DOMActionMessage
   | RequestCompletionMessage
   | CompletionResultMessage
-  | PageContextMessage;
+  | PageContextMessage
+  | GetTabIdMessage
+  | TabIdResponseMessage;
