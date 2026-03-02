@@ -1,6 +1,12 @@
 import { extractContent, getSurroundings } from "./extraction";
 import { GhostText } from "./ghost";
-import { currentPageMetadata, isTextInput, toPageElement } from "./utils";
+import {
+  currentPageMetadata,
+  getValue,
+  isTextInput,
+  pageContextHash,
+  toPageElement,
+} from "./utils";
 import {
   CompletionContext,
   CompletionResultMessage,
@@ -17,18 +23,17 @@ const DEBOUNCE_MS = 500;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function onFocusIn(e: FocusEvent) {
-  if (isTextInput(e.target)) {
-    ghost.attach(e.target);
-  }
+  if (!isTextInput(e.target)) return;
+  ghost.attach(e.target);
+  e.target.dataset.valueOnFocus = getValue(e.target);
 }
 
 function onFocusOut(e: FocusEvent) {
-  if (isTextInput(e.target)) {
-    ghost.detach();
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-    }
+  if (!isTextInput(e.target)) return;
+  ghost.detach();
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
   }
 }
 
@@ -36,7 +41,7 @@ function isPageBodyScrollable(): boolean {
   return document.body.scrollHeight > window.innerHeight * 1.5;
 }
 
-function sendPageContext() {
+async function sendPageContext() {
   const pageScrollable = isPageBodyScrollable();
   const minY = Math.max(window.scrollY - window.innerHeight * 0.5, 0);
   const maxY = Math.min(
@@ -58,7 +63,20 @@ function sendPageContext() {
       : { start: 0, end: 1 },
   };
 
-  chrome.runtime.sendMessage({
+  const hash = pageContextHash(pageContext);
+  const storageKey = pageContext.pageMetadata.url + "_hash";
+  const timeKey = pageContext.pageMetadata.url + "_time";
+  const stored = await chrome.storage.session.get([storageKey, timeKey]);
+  const age = stored[timeKey] ? Date.now() - stored[timeKey] : 0;
+  const expired = age > 1000 * 60 * 30; // 30 minutes
+
+  if (!expired && stored[storageKey] === hash) return;
+
+  await chrome.storage.session.set({
+    [storageKey]: hash,
+    [timeKey]: Date.now(),
+  });
+  await chrome.runtime.sendMessage({
     type: MessageType.PAGE_CONTEXT,
     pageContext,
   } as PageContextMessage);
@@ -82,10 +100,22 @@ function onChange(e: Event) {
   sendDOMActionMessage({
     type: "change",
     element: toPageElement(e.target as HTMLElement, true),
+    previousValue: (e.target as HTMLElement).dataset.valueOnFocus,
   });
 }
 
+function clickDidSomething(e: MouseEvent): boolean {
+  if (!e.target) return false;
+  return !!(e.target as HTMLElement).closest(
+    "a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), " +
+      'textarea:not(:disabled), label, [role="button"], [role="link"], ' +
+      '[role="menuitem"], [role="tab"], [onclick]',
+  );
+}
+
 function onClick(e: MouseEvent) {
+  if (!clickDidSomething(e)) return;
+
   sendDOMActionMessage({
     type: "click",
     element: toPageElement(e.target as HTMLElement, true),

@@ -63,6 +63,7 @@ export type DOMAction = {
   element?: PageElement;
   type: "change" | "click" | "navigation" | "other";
   lastUrl?: string; // for navigation events
+  previousValue?: string; // for change events
 };
 
 export type Suggestion = {

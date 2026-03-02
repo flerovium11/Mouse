@@ -15,10 +15,19 @@ const mouseSleepingImage = document.createElement("img");
 mouseSleepingImage.src = mouseSleepingImageUrl;
 mouseSleepingImage.className = "mouse-sleeping-image";
 
+const modifierKeyPrefix =
+  navigator.platform.startsWith("Mac") || navigator.platform === "iPhone"
+    ? "⌘"
+    : "Ctrl";
+const shortcutHint = document.createElement("div");
+shortcutHint.className = "shortcut-hint";
+shortcutHint.innerHTML = `${modifierKeyPrefix} + M`;
+
 const activeToggle = document.createElement("div");
 activeToggle.className = "mouse-active-toggle";
 activeToggle.appendChild(mouseImage);
 activeToggle.appendChild(mouseSleepingImage);
+activeToggle.appendChild(shortcutHint);
 document.body.appendChild(activeToggle);
 
 let captureEnabled = true;

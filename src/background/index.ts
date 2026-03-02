@@ -39,13 +39,15 @@ chrome.runtime.onMessage.addListener((msg: Message, sender, sendResponse) => {
 
   switch (msg.type) {
     case MessageType.DOM_ACTION:
+      console.log("Recorded DOM action:", msg.action);
       domActions.push({ ...msg.action, tabId, frameId });
+      // TODO: Maybe keep more context and store actions in vector db?
       if (domActions.length > 10) domActions.shift();
       break;
     case MessageType.PAGE_CONTEXT:
-      pageContexts.set(tabId, { ...msg.pageContext, tabId, frameId });
       console.log("Received page context for tab", tabId, "frame", frameId);
       console.log(msg.pageContext.content);
+      pageContexts.set(tabId, { ...msg.pageContext, tabId, frameId });
       getUuid()
         .then((id) => dump(id, msg.pageContext))
         .catch(console.error);

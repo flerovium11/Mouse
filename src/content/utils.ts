@@ -78,3 +78,19 @@ export function currentPageMetadata(): PageMetadata {
     domain: window.location.hostname,
   };
 }
+
+export function quickHash(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return h >>> 0; // unsigned 32-bit int
+}
+
+export function pageContextHash(ctx: {
+  pageMetadata: PageMetadata;
+  content: string;
+}): number {
+  const metaString = `${ctx.pageMetadata.url}|${ctx.pageMetadata.title}|${ctx.pageMetadata.description ?? ""}`;
+  return quickHash(metaString + "|" + ctx.content);
+}

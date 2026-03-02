@@ -13,6 +13,7 @@ const excludeSelectors = [
   "#sidebar",
   ".ads",
   ".advertisement",
+  ".mouse-active-toggle",
   ".cookie-consent",
   ".cookie-notice",
   ".cookie-consent-banner",
