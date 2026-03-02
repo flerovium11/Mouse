@@ -19,22 +19,21 @@ import {
 
 export const ghost = new GhostText();
 
-const DEBOUNCE_MS = 500;
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+const DOUBLE_SHIFT_MS = 300;
+let lastShiftTime = 0;
+let activeInput: HTMLElement | null = null;
 
 function onFocusIn(e: FocusEvent) {
   if (!isTextInput(e.target)) return;
+  activeInput = e.target;
   ghost.attach(e.target);
   e.target.dataset.valueOnFocus = getValue(e.target);
 }
 
 function onFocusOut(e: FocusEvent) {
   if (!isTextInput(e.target)) return;
+  activeInput = null;
   ghost.detach();
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
 }
 
 // TODO: This will send the entire page content on pages
@@ -127,41 +126,46 @@ function onClick(e: MouseEvent) {
 
 function onInput(e: Event) {
   if (!isTextInput(e.target)) return;
-  const input = e.target;
-
   ghost.clear();
   ghost.syncPosition();
+}
 
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    const value =
-      "value" in input
-        ? (input as HTMLInputElement).value
-        : ((input as HTMLElement).textContent ?? "");
-    if (!value.trim()) return;
-    const completionContext: CompletionContext = {
-      timestamp: Date.now(),
-      pageMetadata: currentPageMetadata(),
-      element: toPageElement(input, true),
-    };
+function requestCompletion(input: HTMLElement) {
+  const value =
+    "value" in input
+      ? (input as HTMLInputElement).value
+      : ((input as HTMLElement).textContent ?? "");
+  if (!value.trim()) return;
+  const completionContext: CompletionContext = {
+    timestamp: Date.now(),
+    pageMetadata: currentPageMetadata(),
+    element: toPageElement(input, true),
+  };
 
-    chrome.runtime.sendMessage(
-      { type: MessageType.REQUEST_COMPLETION, completionContext },
-      (response: CompletionResultMessage) => {
-        if (response.error) {
-          console.error("Error from background:", response.error);
-          return;
-        }
+  chrome.runtime.sendMessage(
+    { type: MessageType.REQUEST_COMPLETION, completionContext },
+    (response: CompletionResultMessage) => {
+      if (response.error) {
+        console.error("Error from background:", response.error);
+        return;
+      }
 
-        if (response.suggestions.length > 0)
-          ghost.show(response.suggestions[0].text);
-      },
-    );
-  }, DEBOUNCE_MS);
+      if (response.suggestions.length > 0)
+        ghost.show(response.suggestions[0].text);
+    },
+  );
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === "Tab") {
+  if (e.key === "Shift") {
+    const now = Date.now();
+    if (now - lastShiftTime < DOUBLE_SHIFT_MS) {
+      lastShiftTime = 0;
+      if (activeInput) requestCompletion(activeInput);
+    } else {
+      lastShiftTime = now;
+    }
+  } else if (e.key === "Tab") {
     const accepted = ghost.accept();
     if (accepted !== null) {
       // Prevent Tab from moving focus only when we consumed it
