@@ -7,6 +7,7 @@ import sys
 import json
 import uuid as uuid_lib
 import os
+import difflib
 from typing import Optional, List
 
 sys.path.append('.')
@@ -36,6 +37,17 @@ with open(os.path.join(PROMPT_DIR, 'gen_prompt.txt'), 'r') as f:
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIM = 3072
 GENERATION_MODEL = "gemini-2.5-flash-lite"
+
+SUGGESTION_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"},
+        },
+        "required": ["text"],
+    },
+}
 
 # --- Singletons ---
 
@@ -86,13 +98,15 @@ def _get_user_id(x_user_id: Optional[str]) -> str:
     return x_user_id
 
 
-def _embed_texts(texts: List[str]) -> list:
+def _embed_texts(texts: List[str], task_type: Optional[str] = None) -> list:
     """Embed a list of texts using Gemini."""
+    config = types.EmbedContentConfig(task_type=task_type) if task_type else None
     embeds = []
     for i in range(0, len(texts), 100):  # Batch in groups of 10 to avoid Gemini limits
         results = gemini_client.models.embed_content(
             model=EMBEDDING_MODEL,
             contents=texts[i:i+100],
+            config=config,
         )
         embeds.extend(results.embeddings)
     return embeds
@@ -153,7 +167,7 @@ async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None)):
         ),
     )
 
-    embeddings = _embed_texts(texts)
+    embeddings = _embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")
 
     points = [
         PointStruct(
@@ -198,22 +212,31 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
     history_context = ""
     col_info = qdrant.get_collection(col_name)
     if col_info.points_count > 0:
-        query_embedding = _embed_texts([query_text])[0]
+        query_embedding = _embed_texts([query_text], task_type="RETRIEVAL_QUERY")[0]
         search_results = qdrant.query_points(
             collection_name=col_name,
             query=query_embedding.values,
-            limit=20,
+            limit=15,
+            score_threshold=0.6,
         )
+        seen_contents: list[str] = []
+        deduped_points = []
+        for pt in search_results.points:
+            c = pt.payload.get("content", "")
+            if c in seen_contents:
+                continue
+            if any(difflib.SequenceMatcher(None, c, s).ratio() > 0.85 for s in seen_contents):
+                continue
+            seen_contents.append(c)
+            deduped_points.append(pt)
+
         history_snippets = [
             f"- [{pt.payload.get('title', '')}] {pt.payload.get('content', '')}"
-            for pt in search_results.points
+            for pt in deduped_points
         ]
         history_context = "\n".join(history_snippets) if history_snippets else "No relevant history found."
     else:
         history_context = "No browsing history stored yet."
-
-    # Format page chunks
-    chunks_text = body.content or "No page content available."
 
     # Format recent actions
     recent = body.recentActions or []
@@ -229,7 +252,6 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
         "{url}": body.pageMetadata.url,
         "{title}": body.pageMetadata.title,
         "{domain}": body.pageMetadata.domain,
-        "{chunks}": chunks_text,
         "{history_context}": history_context,
         "{tag}": element.tag,
         "{element_type}": element.type or "N/A",
@@ -255,13 +277,14 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
             temperature=0.3,
             top_p=0.95,
             top_k=40,
+            response_mime_type="application/json",
+            response_schema=SUGGESTION_SCHEMA,
         ),
     )
     print(f"Raw response from Gemini:\n{response.text}\n---")
 
-    raw = response.text.replace("```json", "").replace("```", "").strip()
     try:
-        suggestions_raw = json.loads(raw)
+        suggestions_raw = json.loads(response.text)
     except json.JSONDecodeError:
         suggestions_raw = []
 
