@@ -15,10 +15,13 @@ const mouseSleepingImage = document.createElement("img");
 mouseSleepingImage.src = mouseSleepingImageUrl;
 mouseSleepingImage.className = "mouse-sleeping-image";
 
+const platform: string =
+  (navigator as unknown as { userAgentData?: { platform: string } })
+    .userAgentData?.platform ??
+  navigator.platform ??
+  "";
 const modifierKeyPrefix =
-  navigator.platform.startsWith("Mac") || navigator.platform === "iPhone"
-    ? "⌘"
-    : "Ctrl";
+  platform.startsWith("Mac") || platform === "iPhone" ? "⌘" : "Ctrl";
 const shortcutHint = document.createElement("div");
 shortcutHint.className = "shortcut-hint";
 shortcutHint.innerHTML = `${modifierKeyPrefix} + M`;
@@ -31,6 +34,7 @@ activeToggle.appendChild(shortcutHint);
 document.body.appendChild(activeToggle);
 
 let captureEnabled = true;
+let globalEnabled = true;
 let tabId: number | null = null;
 
 function getTabId(): Promise<number> {
@@ -49,6 +53,7 @@ function getTabId(): Promise<number> {
 }
 
 const STORAGE_KEY = "captureEnabled";
+const GLOBAL_KEY = "globalEnabled";
 
 async function loadCaptureState(): Promise<boolean> {
   const tabId = await getTabId();
@@ -57,17 +62,15 @@ async function loadCaptureState(): Promise<boolean> {
 }
 
 async function saveCaptureState(enabled: boolean): Promise<void> {
-  const tabId = await getTabId();
+  const id = await getTabId();
   const result = await chrome.storage.session.get(STORAGE_KEY);
+  const updated = { ...(result[STORAGE_KEY] || {}), [id]: enabled };
+  await chrome.storage.session.set({ [STORAGE_KEY]: updated });
+}
 
-  const updated = {
-    ...(result[STORAGE_KEY] || {}),
-    [tabId]: enabled,
-  };
-
-  await chrome.storage.session.set({
-    [STORAGE_KEY]: updated,
-  });
+async function loadGlobalState(): Promise<boolean> {
+  const result = await chrome.storage.local.get(GLOBAL_KEY);
+  return result[GLOBAL_KEY] ?? true;
 }
 
 let blinkTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -97,15 +100,21 @@ function showActivationAnimation(): void {
   });
 }
 
-function setCaptureEnabled(enabled: boolean, animate: boolean = true): void {
-  captureEnabled = enabled;
-
+function applyState(animate: boolean = true): void {
   if (blinkTimeout) {
     clearTimeout(blinkTimeout);
     blinkTimeout = null;
   }
 
-  if (enabled) {
+  if (!globalEnabled) {
+    activeToggle.style.display = "none";
+    stopCapture();
+    return;
+  }
+
+  activeToggle.style.display = "";
+
+  if (captureEnabled) {
     activeToggle.classList.add("active");
     startCapture();
     blink();
@@ -119,14 +128,35 @@ function setCaptureEnabled(enabled: boolean, animate: boolean = true): void {
 initToggle();
 
 async function initToggle() {
-  const enabled = await loadCaptureState();
-  setCaptureEnabled(enabled, false);
+  [globalEnabled, captureEnabled] = await Promise.all([
+    loadGlobalState(),
+    loadCaptureState(),
+  ]);
+  applyState(false);
+
+  // Keep state in sync with popup (and other tabs)
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && GLOBAL_KEY in changes) {
+      const newValue = changes[GLOBAL_KEY].newValue ?? true;
+      if (newValue === globalEnabled) return;
+      globalEnabled = newValue;
+      applyState();
+    }
+    if (area === "session" && STORAGE_KEY in changes) {
+      if (tabId === null) return;
+      const newValue = changes[STORAGE_KEY].newValue?.[tabId] ?? true;
+      if (newValue === captureEnabled) return;
+      captureEnabled = newValue;
+      applyState();
+    }
+  });
 
   activeToggle.addEventListener("click", async () => {
     if (hasDragged) return;
-    const newEnabled = !captureEnabled;
-    setCaptureEnabled(newEnabled);
-    saveCaptureState(newEnabled);
+    captureEnabled = !captureEnabled;
+    // Instant UI update
+    applyState();
+    await saveCaptureState(captureEnabled);
   });
 
   window.addEventListener("resize", () => {
@@ -136,32 +166,25 @@ async function initToggle() {
     ) {
       togglePosition.y =
         document.documentElement.clientHeight - activeToggle.offsetHeight - 30;
-      updateTogglePosition();
-    } else if (
-      togglePosition.x >
-      document.documentElement.clientWidth - activeToggle.offsetWidth - 30
-    ) {
-      togglePosition.x =
-        document.documentElement.clientWidth - activeToggle.offsetWidth - 30;
-      updateTogglePosition();
     }
-
     if (
       togglePosition.x >
       document.documentElement.clientWidth - activeToggle.offsetWidth - 30
     ) {
       togglePosition.x =
         document.documentElement.clientWidth - activeToggle.offsetWidth - 30;
-      updateTogglePosition();
     }
+    updateTogglePosition();
   });
 
-  window.addEventListener("keydown", (e) => {
+  window.addEventListener("keydown", async (e) => {
     if (e.key === "m" && (e.metaKey || e.ctrlKey)) {
+      if (!globalEnabled) return;
       e.preventDefault();
-      const newEnabled = !captureEnabled;
-      setCaptureEnabled(newEnabled);
-      saveCaptureState(newEnabled);
+      captureEnabled = !captureEnabled;
+      // Instant UI update
+      applyState();
+      await saveCaptureState(captureEnabled);
     }
   });
 }

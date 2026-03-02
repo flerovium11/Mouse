@@ -6,13 +6,44 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <h1>Mouse</h1>
+    <div class="header">
+      <img id="logo" class="logo" alt="" />
+      <span class="title">Mouse</span>
+      <span id="globalBadge" class="badge badge--on">ON</span>
+    </div>
 
-    <label for="apiKey">Gemini API Key</label>
-    <input type="password" id="apiKey" placeholder="AIza…" autocomplete="off" />
-    <button id="save">Save</button>
+    <div class="section">
+      <div class="section-row">
+        <div class="section-label">
+          <span class="label-title">Extension Active</span>
+          <span class="label-sub">Globally enable or disable Mouse</span>
+        </div>
+        <label class="ios-toggle" aria-label="Toggle extension globally">
+          <input type="checkbox" id="globalToggle" />
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+    </div>
 
-    <p id="status" aria-live="polite"></p>
+    <div class="divider"></div>
+
+    <div class="section" id="tabSection">
+      <div class="section-row">
+        <div class="section-label">
+          <span class="label-title">Active on This Tab</span>
+          <span class="label-sub">Enable or disable Mouse for this tab</span>
+        </div>
+        <label class="ios-toggle" aria-label="Toggle extension for this tab">
+          <input type="checkbox" id="tabToggle" />
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-label">Toggle with</span>
+        <span id="shortcutHint" class="shortcut-keys"></span>
+      </div>
+    </div>
+
     <script type="module" src="/dist/popup.js"></script>
   </body>
 </html>
