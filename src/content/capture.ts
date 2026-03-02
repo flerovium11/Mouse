@@ -37,6 +37,9 @@ function onFocusOut(e: FocusEvent) {
   }
 }
 
+// TODO: This will send the entire page content on pages
+//  that have different scroll containers than body.
+//  Consider detecting these scroll containers (painful).
 function isPageBodyScrollable(): boolean {
   return document.body.scrollHeight > window.innerHeight * 1.5;
 }
@@ -54,7 +57,7 @@ async function sendPageContext() {
     pageMetadata: currentPageMetadata(),
     content: pageScrollable
       ? extractContent(minY, maxY)
-      : extractContent(0, Infinity),
+      : extractContent(-Infinity, Infinity),
     contentBounds: pageScrollable
       ? {
           start: minY / document.body.scrollHeight,

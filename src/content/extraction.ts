@@ -32,7 +32,7 @@ export function extractContent(minY: number, maxY: number): string {
 function htmlToMarkdown(
   element: HTMLElement | ChildNode,
   textContentOnly: boolean = true,
-  minY: number = 0,
+  minY: number = -Infinity,
   maxY: number = Infinity,
 ): string {
   let result = "";
@@ -46,10 +46,12 @@ function htmlToMarkdown(
     if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
     const el = node as HTMLElement;
-    if (getComputedStyle(el).display === "none") continue;
-    if (excludeSelectors.some((sel) => el.matches(sel))) continue;
+    const style = getComputedStyle(el);
+    if (style.display === "none") continue;
     const rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) continue;
+    if (style.display !== "contents" && (rect.width === 0 || rect.height === 0))
+      continue;
+    if (excludeSelectors.some((sel) => el.matches(sel))) continue;
 
     const absTop = rect.top + window.scrollY;
     const absBottom = absTop + rect.height;
@@ -109,7 +111,10 @@ function htmlToMarkdown(
             .join("\n") + "\n\n";
         break;
       case "a": {
-        if (textContentOnly) result += inner;
+        if (textContentOnly) {
+          result += inner;
+          break;
+        }
         const href = el.getAttribute("href") ?? "";
         result += `[${inner}](${href.slice(0, 30)})`;
         break;
