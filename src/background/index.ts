@@ -8,7 +8,7 @@ import {
   PageContext,
   RequestCompletionMessage,
 } from "@shared/types";
-import { register, dump, gen } from "@shared/mock-api";
+import { register, dump, gen } from "@shared/api";
 
 console.info("Background service worker started");
 chrome.storage.session.setAccessLevel({

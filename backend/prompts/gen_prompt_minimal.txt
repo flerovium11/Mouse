@@ -1,0 +1,13 @@
+Autocomplete the form field below. Output ONLY the text that comes after the cursor — never rewrite existing text. Return [] if unsure.
+
+Field: <{tag} type="{element_type}" name="{name_attr}" placeholder="{placeholder}" aria-label="{aria_label}">
+Label: {label}
+Current value: "{value}"
+Cursor position: {cursor_position}
+
+Page: {title} ({domain})
+
+User history:
+{history_context}
+
+Return a JSON array of objects with key "text", max 3 items.
