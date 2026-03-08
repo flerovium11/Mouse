@@ -2,8 +2,8 @@
 // with invisible typed text followed by gray suggestion text — so the gray
 // text appears exactly at the cursor position.
 
-import { type TextInput } from "./types";
-import { getCursorPos, getValue, isNativeInput } from "./utils";
+import { type TextInput } from "../types";
+import { getCursorPos, getValue, isNativeInput } from "../utils";
 
 const COPIED_STYLES: (keyof CSSStyleDeclaration)[] = [
   "color",

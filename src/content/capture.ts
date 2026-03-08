@@ -1,5 +1,6 @@
 import { extractContent, getSurroundings } from "./extraction";
-import { GhostText } from "./ghost";
+import { ChatUI } from "./ui/chat";
+import { GhostText } from "./ui/ghost";
 import {
   currentPageMetadata,
   getValue,
@@ -18,20 +19,27 @@ import {
 } from "@shared/types";
 
 export const ghost = new GhostText();
+export const chat = new ChatUI();
 
 const DOUBLE_SHIFT_MS = 300;
 let lastShiftTime = 0;
 let activeInput: HTMLElement | null = null;
 
+function targetsExtensionUI(target: EventTarget | null): boolean {
+  if (!target) return false;
+  const element = target as HTMLElement;
+  return element.classList.contains("mouse-chat-input");
+}
+
 function onFocusIn(e: FocusEvent) {
-  if (!isTextInput(e.target)) return;
+  if (!isTextInput(e.target) || targetsExtensionUI(e.target)) return;
   activeInput = e.target;
   ghost.attach(e.target);
   e.target.dataset.valueOnFocus = getValue(e.target);
 }
 
 function onFocusOut(e: FocusEvent) {
-  if (!isTextInput(e.target)) return;
+  if (!isTextInput(e.target) || targetsExtensionUI(e.target)) return;
   activeInput = null;
   ghost.detach();
 }
@@ -99,6 +107,7 @@ function sendDOMActionMessage(
 }
 
 function onChange(e: Event) {
+  if (targetsExtensionUI(e.target)) return;
   sendDOMActionMessage({
     type: "change",
     element: toPageElement(e.target as HTMLElement, true),
@@ -116,7 +125,7 @@ function clickDidSomething(e: MouseEvent): boolean {
 }
 
 function onClick(e: MouseEvent) {
-  if (!clickDidSomething(e)) return;
+  if (!clickDidSomething(e) || targetsExtensionUI(e.target)) return;
 
   sendDOMActionMessage({
     type: "click",
@@ -125,7 +134,7 @@ function onClick(e: MouseEvent) {
 }
 
 function onInput(e: Event) {
-  if (!isTextInput(e.target)) return;
+  if (!isTextInput(e.target) || targetsExtensionUI(e.target)) return;
   ghost.clear();
   ghost.syncPosition();
 }
@@ -156,6 +165,8 @@ function requestCompletion(input: HTMLElement) {
   );
 }
 
+function openChatWindow() {}
+
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === "Shift") {
     const now = Date.now();
@@ -174,11 +185,16 @@ function onKeyDown(e: KeyboardEvent) {
     }
   } else if (e.key === "Escape") {
     ghost.clear();
+  } else if (e.key === "Enter") {
+    if (e.metaKey || e.ctrlKey) {
+      chat.attach(activeInput);
+    }
   }
 }
 
 function onScroll() {
   ghost.syncPosition();
+  chat.syncPosition();
   discoverNewScrollBounds();
 }
 
@@ -242,6 +258,7 @@ function onUrlChange(lastUrl: string) {
 
 function onResize() {
   ghost.syncPosition();
+  chat.syncPosition();
 }
 
 let mutationObserver: MutationObserver | null = null;
@@ -305,6 +322,7 @@ export function stopCapture(): void {
   window.removeEventListener("scroll", onScroll);
   window.removeEventListener("resize", onResize);
   ghost.detach();
+  chat.detach();
   mutationObserver?.disconnect();
   mutationObserver = null;
 }
