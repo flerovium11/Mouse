@@ -37,6 +37,9 @@
 **Recent User Actions:**
 {recent_actions}
 
+**Additional User-Provided Context:**
+{additional_details}
+
 **Current Value:** "{value}"
 
 ---
