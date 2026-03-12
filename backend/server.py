@@ -24,6 +24,14 @@ from gemini_agent import GeminiAgent, PROMPTS_DIR
 
 EMBEDDING_DIM = 3072
 BENCHMARK_MODE = os.getenv("BENCHMARK_MODE", "").lower() in ("1", "true", "yes")
+
+# Authentication: set AUTH_TOKEN in .env (or environment) to require a
+# Bearer token on every request.  Set DEV_MODE=true to skip the check
+# entirely during local development.
+AUTH_TOKEN: Optional[str] = os.getenv("AUTH_TOKEN")
+print("[server] Authentication is " + ("disabled (no AUTH_TOKEN set)" if not AUTH_TOKEN else"enabled"))
+# Show token value
+DEV_MODE: bool = os.getenv("DEV_MODE", "").lower() in ("1", "true", "yes")
 #BENCHMARK_MODE = True  # Force benchmark mode for now, to generate more data for prompt tuning
 
 # --- Singletons ---
@@ -79,6 +87,20 @@ def _ensure_all_collections(user_id: str):
             )
 
 
+def _verify_auth(authorization: Optional[str]) -> None:
+    """Check the Authorization header unless DEV_MODE is enabled."""
+    if DEV_MODE:
+        return
+    # If no AUTH_TOKEN is configured server-side, treat auth as disabled.
+    if not AUTH_TOKEN:
+        return
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or token != AUTH_TOKEN:
+        raise HTTPException(status_code=403, detail="Invalid or expired token")
+
+
 def _get_user_id(x_user_id: Optional[str]) -> str:
     """Validate the X-User-Id header and auto-register if needed."""
     if not x_user_id:
@@ -93,8 +115,9 @@ def _get_user_id(x_user_id: Optional[str]) -> str:
 # --- Routes ---
 
 @app.post("/register", response_model=RegisterResponse)
-async def register():
+async def register(authorization: Optional[str] = Header(None)):
     """Register a new user and return a UUID."""
+    _verify_auth(authorization)
     user_id = str(uuid_lib.uuid4())
     registered_users.add(user_id)
     _ensure_all_collections(user_id)
@@ -102,8 +125,9 @@ async def register():
 
 
 @app.post("/dump")
-async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None)):
+async def dump(body: DumpRequest, x_user_id: Optional[str] = Header(None), authorization: Optional[str] = Header(None)):
     """Store a visited page's chunks in the user's vector DB collection."""
+    _verify_auth(authorization)
     user_id = _get_user_id(x_user_id)
     dump_limiter.check(user_id)
     result = agent.dump(user_id, qdrant, body)
@@ -127,8 +151,9 @@ def _benchmark_log(agent_name: str, suggestions: List[Suggestion], elapsed: floa
 
 
 @app.post("/gen", response_model=GenResponse)
-async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
+async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None), authorization: Optional[str] = Header(None)):
     """Generate autocomplete suggestions for the current element."""
+    _verify_auth(authorization)
     user_id = _get_user_id(x_user_id)
     gen_limiter.check(user_id)
     print(f"[mouse] gen result={body}")
@@ -156,8 +181,9 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
 
 
 @app.post("/gen-detailed", response_model=GenResponse)
-async def gen_detailed(body: DetailedGenRequest, x_user_id: Optional[str] = Header(None)):
+async def gen_detailed(body: DetailedGenRequest, x_user_id: Optional[str] = Header(None), authorization: Optional[str] = Header(None)):
     """Generate autocomplete suggestions with additional user-provided context."""
+    _verify_auth(authorization)
     user_id = _get_user_id(x_user_id)
     gen_limiter.check(user_id)
 

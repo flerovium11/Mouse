@@ -206,3 +206,63 @@ kbd {
   outline: 2px solid var(--accent-a);
   outline-offset: 2px;
 }
+
+/* --- Auth Token --- */
+
+.token-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.token-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.token-input::placeholder {
+  color: var(--text-muted);
+}
+
+.token-input:focus {
+  border-color: var(--text-active);
+}
+
+.token-save {
+  padding: 6px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.token-save:hover {
+  background: var(--background-active);
+  color: var(--text-active);
+}
+
+.token-status {
+  display: block;
+  font-size: 11px;
+  margin-top: 6px;
+  min-height: 16px;
+  color: var(--text-muted);
+}
+
+.token-status--success {
+  color: var(--text-active);
+}

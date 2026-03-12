@@ -1,5 +1,6 @@
 const GLOBAL_KEY = "globalEnabled";
 const CAPTURE_KEY = "captureEnabled";
+const TOKEN_KEY = "authToken";
 
 const globalToggle = document.getElementById(
   "globalToggle",
@@ -9,6 +10,9 @@ const tabSection = document.getElementById("tabSection") as HTMLElement;
 const globalBadge = document.getElementById("globalBadge") as HTMLElement;
 const shortcutHint = document.getElementById("shortcutHint") as HTMLElement;
 const logo = document.getElementById("logo") as HTMLImageElement;
+const tokenInput = document.getElementById("tokenInput") as HTMLInputElement;
+const tokenSave = document.getElementById("tokenSave") as HTMLButtonElement;
+const tokenStatus = document.getElementById("tokenStatus") as HTMLElement;
 
 logo.src = chrome.runtime.getURL("images/mouse.svg");
 
@@ -136,6 +140,27 @@ async function init(): Promise<void> {
       tabToggle.checked = !tabToggle.checked;
       await saveTabState();
     }
+  });
+
+  // --- Auth token ---
+  const storedToken = await chrome.storage.local.get(TOKEN_KEY);
+  if (storedToken[TOKEN_KEY]) {
+    tokenInput.value = storedToken[TOKEN_KEY] as string;
+  }
+
+  tokenSave.addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    await chrome.storage.local.set({ [TOKEN_KEY]: token });
+    tokenStatus.textContent = token ? "Token saved ✓" : "Token cleared";
+    tokenStatus.className = "token-status token-status--success";
+    setTimeout(() => {
+      tokenStatus.textContent = "";
+      tokenStatus.className = "token-status";
+    }, 2000);
+  });
+
+  tokenInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") tokenSave.click();
   });
 }
 
