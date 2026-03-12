@@ -29,8 +29,10 @@ export async function gen(
   ctx: PageContext,
   element: PageElement,
   recentActions: DOMAction[],
+  prompt?: string,
 ): Promise<Suggestion[]> {
-  const res = await fetch(`${BASE}/gen`, {
+  const endpoint = prompt !== undefined ? "/gen-detailed" : "/gen";
+  const res = await fetch(`${BASE}${endpoint}`, {
     method: "POST",
     headers: headers(uuid),
     body: JSON.stringify({
@@ -38,6 +40,7 @@ export async function gen(
       content: ctx.content,
       element,
       recentActions,
+      ...(prompt !== undefined && { additionalDetails: prompt }),
     }),
   });
   const { suggestions } = await res.json();

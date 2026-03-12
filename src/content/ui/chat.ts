@@ -1,130 +1,159 @@
+import {
+  CompletionContext,
+  CompletionResultMessage,
+  MessageType,
+} from "@shared/types";
+import { currentPageMetadata, isNativeInput, toPageElement } from "../utils";
+
 export class ChatUI {
-  private chat: HTMLDivElement | null = null;
-  private messageContainer: HTMLDivElement | null = null;
-  private chatInput: HTMLInputElement | null = null;
+  private container: HTMLDivElement | null = null;
+  private promptInput: HTMLInputElement | null = null;
   private activeInput: HTMLElement | null = null;
-  private mode: "generate" | "ask" = "generate";
-  private messageHistory: { sender: "user" | "assistant"; text: string }[] = [];
+  private anchorTop = "";
+  private anchorLeft = "";
+  private anchorWidth = "";
+  private loading = false;
 
   attach(input: HTMLElement | null) {
     this.detach();
     this.activeInput = input;
-    this.chat = this.buildChat();
-    this.messageContainer = this.chat.querySelector(
-      ".chat-messages",
-    ) as HTMLDivElement;
-    document.body.appendChild(this.chat);
+
+    this.container = this.build();
+    document.body.appendChild(this.container);
+
     this.syncPosition();
-    this.chatInput?.focus();
+    this.promptInput?.focus();
+
+    const onOutsideClick = (e: MouseEvent) => {
+      if (!this.container?.contains(e.target as Node)) {
+        this.detach();
+        document.removeEventListener("mousedown", onOutsideClick, true);
+      }
+    };
+
+    document.addEventListener("mousedown", onOutsideClick, true);
   }
 
   detach() {
-    this.chat?.remove();
-    this.chat = null;
-    this.messageContainer = null;
+    this.container?.remove();
+    this.container = null;
+    this.promptInput = null;
     this.activeInput = null;
-  }
-
-  private buildChat(): HTMLDivElement {
-    const chat = document.createElement("div");
-    chat.className = "mouse-chat";
-    chat.innerHTML = `
-        <div class="chat-header">
-            <div class="mode-toggle" role="group" aria-label="Mode">
-            <button class="mode-btn active" data-mode="generate" aria-pressed="true">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
-                </svg>
-            </button>
-            <button class="mode-btn" data-mode="ask" aria-pressed="false">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
-                </svg>
-            </button>
-            </div>
-            <input type="text" name="mouse-chat-input" placeholder="Type a message..." />
-            <div class="actions">
-            <button class="send-button" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
-                </svg>
-            </button>
-            <button class="close-button">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-            </button>
-            </div>
-        </div>
-        <div class="chat-messages" role="log" aria-live="polite"></div>
-    `;
-
-    chat
-      .querySelector(".close-button")
-      ?.addEventListener("click", () => this.detach());
-
-    this.chatInput = chat.querySelector("input");
-    const sendButton = chat.querySelector(".send-button") as HTMLButtonElement;
-    this.chatInput?.addEventListener("input", () => {
-      sendButton.disabled = !this.chatInput?.value.trim();
-    });
-    this.chatInput?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !sendButton.disabled) {
-        e.preventDefault();
-        this.onSend(this.chatInput?.value ?? "");
-      }
-    });
-    sendButton.addEventListener("click", () => {
-      this.onSend(this.chatInput?.value ?? "");
-    });
-
-    const modeButtons = chat.querySelectorAll(".mode-btn");
-    modeButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        modeButtons.forEach((b) => {
-          b.classList.remove("active");
-          b.setAttribute("aria-pressed", "false");
-        });
-        btn.classList.add("active");
-        this.mode = btn.getAttribute("data-mode") as "generate" | "ask";
-        btn.setAttribute("aria-pressed", "true");
-      });
-    });
-
-    return chat;
-  }
-
-  private onSend(message: string) {
-    if (!message.trim()) return;
-    this.chatInput!.value = "";
-    this.addMessage(message, "user");
-  }
-
-  private addMessage(text: string, sender: "user" | "assistant") {
-    if (!this.chat || !this.messageContainer) return;
-    this.messageHistory.push({ sender, text });
-    const messageElem = document.createElement("div");
-    messageElem.className = `chat-message ${sender}`;
-    messageElem.textContent = text;
-    this.messageContainer.appendChild(messageElem);
-    this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+    this.anchorTop = "";
+    this.anchorLeft = "";
+    this.anchorWidth = "";
+    this.loading = false;
   }
 
   syncPosition() {
-    if (!this.chat) return;
+    if (!this.container || !this.activeInput) return;
+
+    this.container.style.position = "absolute";
+
+    if (isNativeInput(this.activeInput)) {
+      const rect = this.activeInput.getBoundingClientRect();
+
+      this.container.style.top = `${rect.bottom + window.scrollY + 8}px`;
+      this.container.style.left = `${rect.left + window.scrollX}px`;
+      this.container.style.width = `${rect.width}px`;
+    } else {
+      const caretRect = getCaretRect();
+      const inputRect = this.activeInput.getBoundingClientRect();
+
+      const anchor = caretRect ?? inputRect;
+
+      this.container.style.top = `${anchor.bottom + window.scrollY + 8}px`;
+      this.container.style.left = `${inputRect.left + window.scrollX}px`;
+      this.container.style.width = `${inputRect.width}px`;
+    }
+  }
+
+  private build(): HTMLDivElement {
+    const container = document.createElement("div");
+    container.className = "mouse-prompt";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "What should I write?";
+    input.className = "mouse-prompt-input";
+    container.appendChild(input);
+    this.promptInput = input;
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && input.value.trim() && !this.loading) {
+        e.preventDefault();
+        this.submit(input.value.trim());
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.detach();
+      }
+    });
+
+    return container;
+  }
+
+  private submit(prompt: string) {
     if (!this.activeInput) {
-      this.chat.style.position = "fixed";
-      this.chat.style.bottom = "20px";
-      this.chat.style.left = "50%";
-      this.chat.style.transform = "translateX(-50%)";
-      this.chat.classList.add("floating");
+      this.detach();
       return;
     }
 
-    this.chat.style.position = "absolute";
-    const rect = this.activeInput.getBoundingClientRect();
-    this.chat.style.top = `${rect.bottom + window.scrollY + 8}px`;
-    this.chat.style.left = `${rect.left + window.scrollX}px`;
-    this.chat.classList.remove("floating");
+    this.loading = true;
+    if (this.promptInput) this.promptInput.disabled = true;
+
+    const activeInput = this.activeInput;
+    const context: CompletionContext = {
+      timestamp: Date.now(),
+      pageMetadata: currentPageMetadata(),
+      element: toPageElement(activeInput, true),
+      prompt,
+    };
+
+    chrome.runtime.sendMessage(
+      { type: MessageType.REQUEST_COMPLETION, completionContext: context },
+      (response: CompletionResultMessage) => {
+        if (!response || response.error || !response.suggestions?.length) {
+          this.detach();
+          return;
+        }
+        this.insertResult(activeInput, response.suggestions[0].text);
+        this.detach();
+      },
+    );
   }
+
+  private insertResult(input: HTMLElement, text: string): void {
+    if (isNativeInput(input)) {
+      const nativeInput = input as HTMLInputElement;
+      const cursor = nativeInput.selectionStart ?? nativeInput.value.length;
+      nativeInput.value =
+        nativeInput.value.slice(0, cursor) +
+        text +
+        nativeInput.value.slice(cursor);
+      const newCursor = cursor + text.length;
+      nativeInput.setSelectionRange(newCursor, newCursor);
+      nativeInput.dispatchEvent(new Event("input", { bubbles: true }));
+      nativeInput.focus();
+    } else {
+      input.focus();
+      document.execCommand("insertText", false, text);
+    }
+  }
+}
+
+function getCaretRect(): DOMRect | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+
+  // getClientRects() works for most cases
+  const rects = range.getClientRects();
+  if (rects.length > 0) return rects[rects.length - 1]; // last rect = cursor end position
+
+  // For collapsed ranges, getBoundingClientRect() returns a zero-size rect but with correct coords
+  // Check bottom/left rather than width/height since width=0 for a cursor
+  const rect = range.getBoundingClientRect();
+  if (rect.bottom !== 0 || rect.left !== 0) return rect;
+
+  return null;
 }

@@ -159,7 +159,8 @@ class GeminiAgent(Agent):
         _ensure_collection(qdrant, col_name)
 
         element = body.element
-        query_text = f"""{element.value or "N/A"}"""
+        query_parts = [p for p in [additional_details, element.value] if p and p.strip()]
+        query_text = " ".join(query_parts) if query_parts else "N/A"
 
         # --- Retrieve relevant history from Qdrant --------------------------
         history_context = ""

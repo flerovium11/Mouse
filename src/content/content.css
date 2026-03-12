@@ -177,48 +177,26 @@
   }
 }
 
-/* ─── Chat Overlay ───────────────────────────────────────────────────────── */
+/* ─── Prompt Overlay ─────────────────────────────────────────────────────── */
 
-.mouse-chat {
-  --mc-bg: #0f0f12;
-  --mc-surface: #18181f;
-  --mc-surface2: #1e1e28;
-  --mc-border: rgba(255, 255, 255, 0.07);
-  --mc-border-strong: rgba(255, 255, 255, 0.12);
-  --mc-text: #e6e6f0;
-  --mc-text-muted: #7a7a99;
-  --mc-accent: rgb(24, 228, 51);
-  --mc-accent-dim: rgba(0, 168, 0, 0.18);
-  --mc-radius: 14px;
-  --mc-width: 380px;
-
+.mouse-prompt {
   position: absolute;
-  width: var(--mc-width);
-  background: var(--mc-bg);
-  border: 1px solid var(--mc-border-strong);
-  border-radius: var(--mc-radius);
+  z-index: 2147483646;
+  box-sizing: border-box;
+  padding: 6px;
+  background: #0f0f12;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.04),
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    0 2px 8px rgba(0, 0, 0, 0.4);
-  z-index: 2147483646;
-  overflow: hidden;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  font-size: 13px;
-  color: var(--mc-text);
-
-  animation: mc-appear 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    0 8px 32px rgba(0, 0, 0, 0.6);
+  animation: mp-appear 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.mouse-chat.floating {
-  --mc-width: 420px;
-}
-
-@keyframes mc-appear {
+@keyframes mp-appear {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.98);
+    transform: translateY(-4px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -226,181 +204,32 @@
   }
 }
 
-.chat-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--mc-border);
-  background: var(--mc-surface);
-}
-
-.mode-toggle {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-  background: var(--mc-surface2);
-  border: 1px solid var(--mc-border);
-  border-radius: 8px;
-  padding: 2px;
-}
-
-.mode-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--mc-text-muted);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-.mode-btn svg {
-  width: 15px;
-  height: 15px;
-  stroke-width: 1.75;
-}
-
-.mode-btn:hover {
-  color: var(--mc-text);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.mode-btn.active {
-  background: var(--mc-accent-dim);
-  color: var(--mc-accent);
-}
-
-.chat-header input[type="text"] {
-  flex: 1;
-  min-width: 0;
+.mouse-prompt-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   height: 32px;
   padding: 0 10px;
-  background: var(--mc-surface2);
-  border: 1px solid var(--mc-border);
-  border-radius: 8px;
-  color: var(--mc-text);
-  font-family: inherit;
+  background: #18181f;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  color: #e6e6f0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
   outline: none !important;
   transition: border-color 0.15s ease;
 }
 
-.chat-header input[type="text"]::placeholder {
-  color: var(--mc-text-muted);
+.mouse-prompt-input::placeholder {
+  color: #7a7a99;
 }
 
-.chat-header input[type="text"]:focus {
+.mouse-prompt-input:focus {
   border-color: rgba(24, 228, 51, 0.35);
-  background: var(--mc-bg);
-}
-.actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
+  background: #0f0f12;
 }
 
-.send-button,
-.close-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 7px;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    opacity 0.15s ease;
-}
-
-.send-button svg,
-.close-button svg {
-  width: 14px;
-  height: 14px;
-  stroke-width: 2;
-}
-
-.send-button {
-  background: var(--mc-accent-dim);
-  color: var(--mc-accent);
-}
-
-.send-button:hover:not(:disabled) {
-  background: rgba(0, 168, 0, 0.3);
-}
-
-.send-button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.close-button {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--mc-text-muted);
-}
-
-.close-button:hover {
-  background: rgba(255, 60, 60, 0.15);
-  color: #ff6b6b;
-}
-
-.chat-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  max-height: 320px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
-}
-
-.chat-messages:empty {
-  display: none;
-}
-
-.chat-message {
-  max-width: 85%;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-  word-break: break-word;
-  animation: mc-msg-in 0.12s ease forwards;
-}
-
-@keyframes mc-msg-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.chat-message.user {
-  align-self: flex-end;
-  background: var(--mc-accent-dim);
-  color: var(--mc-accent);
-  border: 1px solid rgba(24, 228, 51, 0.15);
-  border-bottom-right-radius: 3px;
-}
-
-.chat-message.assistant {
-  align-self: flex-start;
-  background: var(--mc-surface);
-  color: var(--mc-text);
-  border: 1px solid var(--mc-border);
-  border-bottom-left-radius: 3px;
+.mouse-prompt-input:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }

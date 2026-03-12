@@ -28,7 +28,8 @@ let activeInput: HTMLElement | null = null;
 function targetsExtensionUI(target: EventTarget | null): boolean {
   if (!target) return false;
   const element = target as HTMLElement;
-  return element.classList.contains("mouse-chat-input");
+  return element.classList.contains("mouse-chat-input") ||
+    element.classList.contains("mouse-prompt-input");
 }
 
 function onFocusIn(e: FocusEvent) {
@@ -165,8 +166,6 @@ function requestCompletion(input: HTMLElement) {
   );
 }
 
-function openChatWindow() {}
-
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === "Shift") {
     const now = Date.now();
@@ -187,6 +186,8 @@ function onKeyDown(e: KeyboardEvent) {
     ghost.clear();
   } else if (e.key === "Enter") {
     if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      e.stopPropagation();
       chat.attach(activeInput);
     }
   }

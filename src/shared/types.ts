@@ -52,6 +52,8 @@ export type CompletionContext = {
   frameId?: number;
   element: PageElement;
   recentActions?: DOMAction[];
+  /** User-provided prompt from the prompt UI (Ctrl+Enter flow) */
+  prompt?: string;
 };
 
 export type DOMAction = {

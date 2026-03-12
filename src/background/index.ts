@@ -8,7 +8,7 @@ import {
   PageContext,
   RequestCompletionMessage,
 } from "@shared/types";
-import { register, dump, gen } from "@shared/mock-api";
+import { register, dump, gen } from "@shared/api";
 
 console.info("Background service worker started");
 chrome.storage.session.setAccessLevel({
@@ -78,9 +78,13 @@ async function handleCompletionRequest(
       ...msg.completionContext,
       content: "",
     };
-    const suggestions = await gen(id, ctx, msg.completionContext.element, [
-      ...domActions,
-    ]);
+    const suggestions = await gen(
+      id,
+      ctx,
+      msg.completionContext.element,
+      [...domActions],
+      msg.completionContext.prompt,
+    );
     sendResponse({ type: MessageType.COMPLETION_RESULT, suggestions });
   } catch (error) {
     console.error("Error handling completion request:", error);
