@@ -4,8 +4,8 @@
   "description": "AI-powered smart autocomplete for any browser text field",
   "scripts": {
     "prebuild": "rimraf dist",
-    "build": "vite build && vite build --config vite.content.config.ts",
-    "dev": "concurrently \"vite build --watch\" \"vite build --config vite.content.config.ts --watch\"",
+    "build": "vite build && vite build --config vite.content.config.ts && vite build --config vite.docs-frame.config.ts",
+    "dev": "concurrently \"vite build --watch\" \"vite build --config vite.content.config.ts --watch\" \"vite build --config vite.docs-frame.config.ts --watch\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

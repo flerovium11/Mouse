@@ -1,5 +1,6 @@
 import { extractContent, getSurroundings } from "./extraction";
 import { GhostText } from "./ghost";
+import { isGoogleDocs, startDocsCapture } from "./sites/google-docs";
 import {
   currentPageMetadata,
   getValue,
@@ -245,9 +246,14 @@ function onResize() {
 }
 
 let mutationObserver: MutationObserver | null = null;
+let stopDocsCapture: (() => void) | null = null;
 
 export function startCapture(): void {
   console.info("The mouse is watching you 🐁");
+
+  if (isGoogleDocs()) {
+    stopDocsCapture = startDocsCapture(ghost);
+  }
 
   currentMinY = window.scrollY;
   currentMaxY = window.scrollY + window.innerHeight;
@@ -295,6 +301,9 @@ export function startCapture(): void {
 
 export function stopCapture(): void {
   console.info("The mouse is going to sleep 💤");
+
+  stopDocsCapture?.();
+  stopDocsCapture = null;;
 
   document.removeEventListener("focusin", onFocusIn);
   document.removeEventListener("focusout", onFocusOut);

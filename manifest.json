@@ -35,6 +35,10 @@
     {
       "resources": ["images/*"],
       "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["dist/docs-frame.js"],
+      "matches": ["https://docs.google.com/*"]
     }
   ]
 }
