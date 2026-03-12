@@ -1,9 +1,17 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from qdrant_client import QdrantClient
 
-from models import DumpRequest, GenRequest, Suggestion
+from models import DumpRequest, GenRequest, ImageData, Suggestion
+
+
+@dataclass
+class UserContext:
+    """User-provided context to steer generation (text prompt + optional images)."""
+    text: Optional[str] = None
+    images: List[ImageData] = field(default_factory=list)
 
 
 class Agent(ABC):
@@ -47,14 +55,13 @@ class Agent(ABC):
         user_id: str,
         qdrant: QdrantClient,
         body: GenRequest,
-        additional_details: Optional[str] = None,
+        user_context: Optional[UserContext] = None,
     ) -> List[Suggestion]:
         """
         Use the user's stored embeddings + the current element context in
         *body* to produce a list of autocomplete ``Suggestion`` objects.
 
-        *additional_details* is optional free-text context provided by the
-        user to steer the generation (e.g. "I'm applying for a software
-        engineering role at Google").
+        *user_context* optionally carries free-text and/or images provided
+        by the user to steer generation.
         """
         ...

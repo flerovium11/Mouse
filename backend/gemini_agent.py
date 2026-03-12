@@ -1,5 +1,6 @@
 """Concrete Agent implementation backed by Gemini + Qdrant."""
 
+import base64
 import json
 import os
 import uuid as uuid_lib
@@ -19,7 +20,7 @@ from qdrant_client.models import (
     FilterSelector,
 )
 
-from agent import Agent
+from agent import Agent, UserContext
 from models import DumpRequest, GenRequest, Suggestion
 
 
@@ -153,13 +154,14 @@ class GeminiAgent(Agent):
         user_id: str,
         qdrant: QdrantClient,
         body: GenRequest,
-        additional_details: Optional[str] = None,
+        user_context: Optional[UserContext] = None,
     ) -> List[Suggestion]:
         col_name = self.collection_name(user_id)
         _ensure_collection(qdrant, col_name)
 
         element = body.element
-        query_parts = [p for p in [additional_details, element.value] if p and p.strip()]
+        ctx_text = user_context.text if user_context else None
+        query_parts = [p for p in [ctx_text, element.value] if p and p.strip()]
         query_text = " ".join(query_parts) if query_parts else "N/A"
 
         # --- Retrieve relevant history from Qdrant --------------------------
@@ -232,16 +234,25 @@ class GeminiAgent(Agent):
             ),
             "{surroundings}": element.surroundings or "N/A",
             "{recent_actions}": actions_text,
-            "{additional_details}": additional_details or "None provided.",
+            "{additional_details}": (user_context.text if user_context else None) or "None provided.",
         }
         prompt = self._gen_prompt
         for key, val in replacements.items():
             prompt = prompt.replace(key, val)
 
         # --- Call Gemini for suggestions ------------------------------------
+        parts: list = [types.Part.from_text(text=prompt)]
+        for img in (user_context.images if user_context else []):
+            parts.append(
+                types.Part.from_bytes(
+                    data=base64.b64decode(img.data),
+                    mime_type=img.mimeType,
+                )
+            )
+
         response = self._client.models.generate_content(
             model=GENERATION_MODEL,
-            contents=types.Part.from_text(text=prompt),
+            contents=parts,
             config=types.GenerateContentConfig(
                 temperature=0.3,
                 top_p=0.95,

@@ -84,6 +84,7 @@ async function handleCompletionRequest(
       msg.completionContext.element,
       [...domActions],
       msg.completionContext.prompt,
+      msg.completionContext.images,
     );
     sendResponse({ type: MessageType.COMPLETION_RESULT, suggestions });
   } catch (error) {

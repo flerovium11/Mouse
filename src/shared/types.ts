@@ -54,6 +54,7 @@ export type CompletionContext = {
   recentActions?: DOMAction[];
   /** User-provided prompt from the prompt UI (Ctrl+Enter flow) */
   prompt?: string;
+  images?: { data: string; mimeType: string }[];
 };
 
 export type DOMAction = {

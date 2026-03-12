@@ -30,6 +30,7 @@ export async function gen(
   element: PageElement,
   recentActions: DOMAction[],
   prompt?: string,
+  images?: { data: string; mimeType: string }[],
 ): Promise<Suggestion[]> {
   const endpoint = prompt !== undefined ? "/gen-detailed" : "/gen";
   const res = await fetch(`${BASE}${endpoint}`, {
@@ -41,6 +42,7 @@ export async function gen(
       element,
       recentActions,
       ...(prompt !== undefined && { additionalDetails: prompt }),
+      ...(images?.length && { images }),
     }),
   });
   const { suggestions } = await res.json();

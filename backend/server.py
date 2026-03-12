@@ -17,7 +17,7 @@ from models import (
     Suggestion,
 )
 from ratelimit import dump_limiter, gen_limiter
-from agent import Agent
+from agent import Agent, UserContext
 from gemini_agent import GeminiAgent, PROMPTS_DIR
 
 # --- Config ---
@@ -162,7 +162,8 @@ async def gen_detailed(body: DetailedGenRequest, x_user_id: Optional[str] = Head
     gen_limiter.check(user_id)
 
     t0 = time.perf_counter()
-    suggestions = agent.generate(user_id, qdrant, body, additional_details=body.additionalDetails)
+    ctx = UserContext(text=body.additionalDetails, images=body.images or [])
+    suggestions = agent.generate(user_id, qdrant, body, user_context=ctx)
     elapsed = time.perf_counter() - t0
 
     if BENCHMARK_MODE:
@@ -175,7 +176,7 @@ async def gen_detailed(body: DetailedGenRequest, x_user_id: Optional[str] = Head
         for a in benchmark_agents:
             if a is not agent:
                 t1 = time.perf_counter()
-                alt_suggestions = a.generate(user_id, qdrant, body, additional_details=body.additionalDetails)
+                alt_suggestions = a.generate(user_id, qdrant, body, user_context=ctx)
                 alt_elapsed = time.perf_counter() - t1
                 _benchmark_log(a.name, alt_suggestions, alt_elapsed)
 

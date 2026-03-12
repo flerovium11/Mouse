@@ -74,8 +74,13 @@ class GenRequest(BaseModel):
     recentActions: Optional[List[DOMAction]] = None
 
 
+class ImageData(BaseModel):
+    data: str  # base64
+    mimeType: str
+
 class DetailedGenRequest(GenRequest):
     additionalDetails: Optional[str] = None
+    images: Optional[List[ImageData]] = None
 
 
 # --- Response Bodies ---
