@@ -74,6 +74,10 @@ class GenRequest(BaseModel):
     recentActions: Optional[List[DOMAction]] = None
 
 
+class DetailedGenRequest(GenRequest):
+    additionalDetails: Optional[str] = None
+
+
 # --- Response Bodies ---
 
 class RegisterResponse(BaseModel):

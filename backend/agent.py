@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 from qdrant_client import QdrantClient
 
@@ -47,9 +47,14 @@ class Agent(ABC):
         user_id: str,
         qdrant: QdrantClient,
         body: GenRequest,
+        additional_details: Optional[str] = None,
     ) -> List[Suggestion]:
         """
         Use the user's stored embeddings + the current element context in
         *body* to produce a list of autocomplete ``Suggestion`` objects.
+
+        *additional_details* is optional free-text context provided by the
+        user to steer the generation (e.g. "I'm applying for a software
+        engineering role at Google").
         """
         ...

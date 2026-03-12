@@ -12,7 +12,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
 from models import (
-    DumpRequest, GenRequest,
+    DumpRequest, GenRequest, DetailedGenRequest,
     RegisterResponse, GenResponse,
     Suggestion,
 )
@@ -24,6 +24,7 @@ from gemini_agent import GeminiAgent, PROMPTS_DIR
 
 EMBEDDING_DIM = 3072
 BENCHMARK_MODE = os.getenv("BENCHMARK_MODE", "").lower() in ("1", "true", "yes")
+#BENCHMARK_MODE = True  # Force benchmark mode for now, to generate more data for prompt tuning
 
 # --- Singletons ---
 
@@ -146,6 +147,35 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
             if a is not agent:
                 t1 = time.perf_counter()
                 alt_suggestions = a.generate(user_id, qdrant, body)
+                alt_elapsed = time.perf_counter() - t1
+                _benchmark_log(a.name, alt_suggestions, alt_elapsed)
+
+        print(f"{'='*60}\n")
+
+    return GenResponse(suggestions=suggestions)
+
+
+@app.post("/gen-detailed", response_model=GenResponse)
+async def gen_detailed(body: DetailedGenRequest, x_user_id: Optional[str] = Header(None)):
+    """Generate autocomplete suggestions with additional user-provided context."""
+    user_id = _get_user_id(x_user_id)
+    gen_limiter.check(user_id)
+
+    t0 = time.perf_counter()
+    suggestions = agent.generate(user_id, qdrant, body, additional_details=body.additionalDetails)
+    elapsed = time.perf_counter() - t0
+
+    if BENCHMARK_MODE:
+        print(f"\n{'='*60}")
+        print(f"BENCHMARK (detailed) — element: <{body.element.tag}> value=\"{body.element.value or ''}\"")
+        print(f"  Additional details: {body.additionalDetails or '(none)'}")
+        print(f"{'='*60}")
+        _benchmark_log(agent.name, suggestions, elapsed)
+
+        for a in benchmark_agents:
+            if a is not agent:
+                t1 = time.perf_counter()
+                alt_suggestions = a.generate(user_id, qdrant, body, additional_details=body.additionalDetails)
                 alt_elapsed = time.perf_counter() - t1
                 _benchmark_log(a.name, alt_suggestions, alt_elapsed)
 

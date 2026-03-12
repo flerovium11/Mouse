@@ -153,6 +153,7 @@ class GeminiAgent(Agent):
         user_id: str,
         qdrant: QdrantClient,
         body: GenRequest,
+        additional_details: Optional[str] = None,
     ) -> List[Suggestion]:
         col_name = self.collection_name(user_id)
         _ensure_collection(qdrant, col_name)
@@ -230,6 +231,7 @@ class GeminiAgent(Agent):
             ),
             "{surroundings}": element.surroundings or "N/A",
             "{recent_actions}": actions_text,
+            "{additional_details}": additional_details or "None provided.",
         }
         prompt = self._gen_prompt
         for key, val in replacements.items():

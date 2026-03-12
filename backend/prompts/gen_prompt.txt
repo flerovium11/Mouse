@@ -22,6 +22,9 @@ You are an inline autocomplete engine. Predict ONLY the text that comes after th
 **Recent User Actions:**
 {recent_actions}
 
+**Additional User-Provided Context:**
+{additional_details}
+
 **Examples of expected output:**
 
 1. User is typing in a "Email" field, current value is "john.d":

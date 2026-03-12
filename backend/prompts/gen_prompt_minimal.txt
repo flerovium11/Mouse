@@ -10,4 +10,7 @@ Page: {title} ({domain})
 User history:
 {history_context}
 
+Additional context from user:
+{additional_details}
+
 Return a JSON array of objects with key "text", max 3 items.

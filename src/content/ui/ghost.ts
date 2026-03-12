@@ -4,8 +4,8 @@
 // - Contenteditable (e.g. Gmail): small overlay anchored directly to the caret.
 //   No DOM mutation inside the editor — avoids interfering with the app's state.
 
-import { type TextInput } from "./types";
-import { getCursorPos, getValue, isNativeInput } from "./utils";
+import { type TextInput } from "../types";
+import { getCursorPos, getValue, isNativeInput } from "../utils";
 
 const COPIED_STYLES: (keyof CSSStyleDeclaration)[] = [
   "color",
