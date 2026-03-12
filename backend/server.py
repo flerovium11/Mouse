@@ -130,6 +130,7 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None)):
     """Generate autocomplete suggestions for the current element."""
     user_id = _get_user_id(x_user_id)
     gen_limiter.check(user_id)
+    print(f"[mouse] gen result={body}")
 
     t0 = time.perf_counter()
     suggestions = agent.generate(user_id, qdrant, body)
