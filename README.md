@@ -11,8 +11,27 @@ AI-powered smart autocomplete for any browser text field
 
 ## Running the Project
 
+### Extension
 1. `npm install`
 2. `npm run build` / `npm run dev` for development
+
+### Backend
+The backend is built with FastAPI and uses Google Gemini.
+
+
+1. Install dependencies:
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
+2. Create a `.env` file with your configuration:
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   AUTH_TOKEN=your_secure_auth_token_here
+   ```
+3. Start the development server:
+   ```bash
+   fastapi run backend/server.py
+   ```
 
 ### Debugging
 
