@@ -12,22 +12,33 @@ AI-powered smart autocomplete for any browser text field
 ## Running the Project
 
 ### Extension
+
 1. `npm install`
 2. `npm run build` / `npm run dev` for development
 
 ### Backend
-The backend is built with FastAPI and uses Google Gemini.
 
+The backend is built with FastAPI and uses Amazon Bedrock (Nova for generation + Titan for embeddings).
 
 1. Install dependencies:
    ```bash
    pip install -r backend/requirements.txt
    ```
 2. Create a `.env` file with your configuration:
+
    ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
+   AWS_ACCESS_KEY_ID=your_access_key_id
+   AWS_SECRET_ACCESS_KEY=your_secret_access_key
+   AWS_REGION=us-east-1
+
+   # Optional overrides
+   BEDROCK_GENERATION_MODEL=amazon.nova-lite-v1:0
+   BEDROCK_EMBEDDING_MODEL=amazon.titan-embed-text-v2:0
+   BEDROCK_EMBEDDING_DIM=1024
+
    AUTH_TOKEN=your_secure_auth_token_here
    ```
+
 3. Start the development server:
    ```bash
    fastapi run backend/server.py

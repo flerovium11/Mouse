@@ -1,38 +1,37 @@
-import dotenv
-dotenv.load_dotenv()
-
-from fastapi import FastAPI, Header, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import uuid as uuid_lib
-import os
-import time
-from typing import Optional, List
-
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
-
+from bedrock_agent import BedrockAgent, PROMPTS_DIR, EMBEDDING_DIM
+from agent import Agent, UserContext
+from ratelimit import dump_limiter, gen_limiter
 from models import (
     DumpRequest, GenRequest, DetailedGenRequest,
     RegisterResponse, GenResponse,
     Suggestion,
 )
-from ratelimit import dump_limiter, gen_limiter
-from agent import Agent, UserContext
-from gemini_agent import GeminiAgent, PROMPTS_DIR
+from qdrant_client.models import Distance, VectorParams
+from qdrant_client import QdrantClient
+from typing import Optional, List
+import time
+import os
+import uuid as uuid_lib
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Header, HTTPException
+import dotenv
+dotenv.load_dotenv()
+
 
 # --- Config ---
 
-EMBEDDING_DIM = 3072
-BENCHMARK_MODE = os.getenv("BENCHMARK_MODE", "").lower() in ("1", "true", "yes")
+BENCHMARK_MODE = os.getenv(
+    "BENCHMARK_MODE", "").lower() in ("1", "true", "yes")
 
 # Authentication: set AUTH_TOKEN in .env (or environment) to require a
 # Bearer token on every request.  Set DEV_MODE=true to skip the check
 # entirely during local development.
 AUTH_TOKEN: Optional[str] = os.getenv("AUTH_TOKEN")
-print("[server] Authentication is " + ("disabled (no AUTH_TOKEN set)" if not AUTH_TOKEN else"enabled"))
+print("[server] Authentication is " +
+      ("disabled (no AUTH_TOKEN set)" if not AUTH_TOKEN else "enabled"))
 # Show token value
 DEV_MODE: bool = os.getenv("DEV_MODE", "").lower() in ("1", "true", "yes")
-#BENCHMARK_MODE = True  # Force benchmark mode for now, to generate more data for prompt tuning
+# BENCHMARK_MODE = True  # Force benchmark mode for now, to generate more data for prompt tuning
 
 # --- Singletons ---
 
@@ -47,21 +46,21 @@ app.add_middleware(
 qdrant = QdrantClient(":memory:")
 
 # Primary agent used for actual responses
-agent: Agent = GeminiAgent(name="Gemini-Original")
+agent: Agent = BedrockAgent(name="Nova-Original")
 
 # All agents to evaluate in benchmark mode.
 benchmark_agents: List[Agent] = [
     agent,
-    GeminiAgent(
-        name="Gemini-CoT",
+    BedrockAgent(
+        name="Nova-CoT",
         gen_prompt_path=os.path.join(PROMPTS_DIR, "gen_prompt_cot.txt"),
     ),
-    GeminiAgent(
-        name="Gemini-Strict",
+    BedrockAgent(
+        name="Nova-Strict",
         gen_prompt_path=os.path.join(PROMPTS_DIR, "gen_prompt_strict.txt"),
     ),
-    GeminiAgent(
-        name="Gemini-Minimal",
+    BedrockAgent(
+        name="Nova-Minimal",
         gen_prompt_path=os.path.join(PROMPTS_DIR, "gen_prompt_minimal.txt"),
     ),
 ]
@@ -95,7 +94,8 @@ def _verify_auth(authorization: Optional[str]) -> None:
     if not AUTH_TOKEN:
         return
     if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
+        raise HTTPException(
+            status_code=401, detail="Missing Authorization header")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or token != AUTH_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
@@ -164,7 +164,8 @@ async def gen(body: GenRequest, x_user_id: Optional[str] = Header(None), authori
 
     if BENCHMARK_MODE:
         print(f"\n{'='*60}")
-        print(f"BENCHMARK — element: <{body.element.tag}> value=\"{body.element.value or ''}\"")
+        print(
+            f"BENCHMARK — element: <{body.element.tag}> value=\"{body.element.value or ''}\"")
         print(f"{'='*60}")
         _benchmark_log(agent.name, suggestions, elapsed)
 
@@ -194,7 +195,8 @@ async def gen_detailed(body: DetailedGenRequest, x_user_id: Optional[str] = Head
 
     if BENCHMARK_MODE:
         print(f"\n{'='*60}")
-        print(f"BENCHMARK (detailed) — element: <{body.element.tag}> value=\"{body.element.value or ''}\"")
+        print(
+            f"BENCHMARK (detailed) — element: <{body.element.tag}> value=\"{body.element.value or ''}\"")
         print(f"  Additional details: {body.additionalDetails or '(none)'}")
         print(f"{'='*60}")
         _benchmark_log(agent.name, suggestions, elapsed)
@@ -202,7 +204,8 @@ async def gen_detailed(body: DetailedGenRequest, x_user_id: Optional[str] = Head
         for a in benchmark_agents:
             if a is not agent:
                 t1 = time.perf_counter()
-                alt_suggestions = a.generate(user_id, qdrant, body, user_context=ctx)
+                alt_suggestions = a.generate(
+                    user_id, qdrant, body, user_context=ctx)
                 alt_elapsed = time.perf_counter() - t1
                 _benchmark_log(a.name, alt_suggestions, alt_elapsed)
 

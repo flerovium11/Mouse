@@ -34,5 +34,5 @@ class RateLimiter:
 # /dump  — generous: 30 requests per 60 s (page navigations)
 dump_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
-# /gen   — tighter: 10 requests per 60 s (each hits Gemini)
+# /gen   — tighter: 10 requests per 60 s (each hits Bedrock)
 gen_limiter = RateLimiter(max_requests=10, window_seconds=60)
